@@ -3,10 +3,6 @@
 import json
 import requests
 from NetflixRoulette import *
-#import requests_cache
-#todo: add flask front end
-
-#def main():
 
 print "Is movie on Netlix, AMX, Hulu, or Hbo streaming...?"
 moviequery = raw_input('Movie search: ') #gb wants triple encoded
@@ -37,3 +33,20 @@ movieinfo = json.loads(r.text)
 ##guidebox print avail web stream sources
 for websource in movieinfo["subscription_web_sources"]:
    print websource["source"]
+
+#import requests_cache
+#todo: add flask front end
+#todo: prettyprint of some sort for debugging
+
+#todo: make/use virtual env and use py3
+# sudo apt-get install python3
+# pip install --user virtualenv
+# # Create the directory for this workshop
+# $ mkdir flask-workshop
+# $ cd flask-workshop
+# # Create a Python 3 virtualenv under the 'flaskenv' directory
+# $ virtualenv --python=python3 flaskenv
+# # Activate the virtual environment
+# $ source flaskenv/bin/activate
+
+#def main():
