@@ -6,12 +6,10 @@
 
   <body>
   
-	<form action="/results" method="post">
+	<form action="/result" method="post">
 		<input type="text" name="movieq"></input>
 		<input type="submit" value="Search"></input>
 	</form>
-    <p>Movie query: {{ movie }}<p>
-	<p>NFR Response: {{ nfr }}</p>
-	<p>GB Response: {{ gb }}</p>
+    <p>{{ display }}<p>
   </body>
 </html>

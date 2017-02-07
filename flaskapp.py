@@ -1,22 +1,20 @@
 #!/usr/bin/env python
 from flask import Flask, render_template
 from flask import request, redirect
+from mediasearch import mediasearch
 app = Flask(__name__)
+results = []
 
-@app.route("/")
+@app.route('/')
 def home():
-	#import mediasearch
-	movie = "test movie"
-	nfr = "test netflix"
-	gb = "test hulu and hbo"
-	
-	return render_template('index.html', movie=movie, nfr=nfr, gb=gb)
+    return render_template('index.html', display="")
 
-@app.route('/query', methods = ['POST'])
-def query():
+@app.route('/result', methods = ['POST'])
+def displayresults():
     movieq = request.form['movieq']
-    print("The movie query is '" + movieq + "'")
-    return redirect('/')	
-	
+    result = mediasearch(movieq)
+    display = "You can stream on: %s" % result
+    return render_template('index.html', display=display)
+
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=8888)
+  app.run(host='0.0.0.0', port=8888)
