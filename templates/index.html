@@ -5,7 +5,7 @@
   </head>
 
   <body>
-      Check if Movie or TV Show is steaming on Netflix, HBO, Hulu, Amazon Prime, or Showtime
+      Check if Movie or TV Show is streaming on Netflix, HBO, Hulu, Amazon Prime, or Showtime
       <form action="/result" method="post">
           <input type="text" name="movieq"></input>
           <input type="submit" value="Search Movie"></input>
@@ -18,8 +18,8 @@
       <p>{{ display }}<p>
 
       <ul>
-      {% for result in results %}
-        <li>{{ result }}</li>
+      {% for source in sources %}
+        <li>{{ source }}</li>
       {% endfor %}
       </ul>
 
