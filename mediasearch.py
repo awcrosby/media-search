@@ -13,8 +13,7 @@ def mediasearch( moviequery ):
         pass #sys.exc_clear()
 
     ##guidebox movie search
-    apis = json.loads(open('apikeys.json').read())
-    gbkey = apis["guidebox_prod_apikey"]
+    gbkey = json.loads(open('apikeys.json').read())["guidebox_prod_apikey"]
     region = 'US'
     baseapiurl = 'http://api-public.guidebox.com/v1.43/%s/%s' % (region, gbkey)
     moviesearchurl = '%s/search/movie/title/%s/exact' % (baseapiurl, moviequery) #gb wants triple encoded
@@ -45,16 +44,5 @@ if __name__ == "__main__":
 #import requests_cache
 #todo: add flask front end
 #todo: prettyprint or some sort for debugging
-
-#todo: make/use virtual env and use py3
-# sudo apt-get install python3
-# pip install --user virtualenv
-# # Create the directory for this workshop
-# $ mkdir flask-workshop
-# $ cd flask-workshop
-# # Create a Python 3 virtualenv under the 'flaskenv' directory
-# $ virtualenv --python=python3 flaskenv
-# # Activate the virtual environment
-# $ source flaskenv/bin/activate
 
 #def main():

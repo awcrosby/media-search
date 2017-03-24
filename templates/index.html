@@ -5,11 +5,23 @@
   </head>
 
   <body>
-  
-	<form action="/result" method="post">
-		<input type="text" name="movieq"></input>
-		<input type="submit" value="Search"></input>
-	</form>
-    <p>{{ display }}<p>
+      Check if Movie or TV Show is steaming on Netflix, HBO, Hulu, Amazon Prime, or Showtime
+      <form action="/result" method="post">
+          <input type="text" name="movieq"></input>
+          <input type="submit" value="Search Movie"></input>
+      </form>
+      <form action="/result" method="post">
+          <input type="text" name="movieq"></input>
+          <input type="submit" value="Search TV"></input>
+      </form>
+
+      <p>{{ display }}<p>
+
+      <ul>
+      {% for result in results %}
+        <li>{{ result }}</li>
+      {% endfor %}
+      </ul>
+
   </body>
 </html>

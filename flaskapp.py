@@ -17,4 +17,4 @@ def displayresults():
     return render_template('index.html', display=display)
 
 if __name__ == "__main__":
-  app.run(host='0.0.0.0', port=8888)
+  app.run(host='0.0.0.0', port=8181)
