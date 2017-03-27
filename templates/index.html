@@ -5,7 +5,7 @@
   </head>
 
   <body>
-      Check if Movie or TV Show is streaming on Netflix, HBO, Hulu, Amazon Prime, or Showtime
+      <p>Check if Movie or TV Show is streaming on Netflix, HBO, Hulu, Amazon Prime, or Showtime</p>
       <form action="/result" method="post">
           <input type="text" name="movieq"></input>
           <input type="submit" value="Search Movie"></input>
@@ -15,7 +15,8 @@
           <input type="submit" value="Search TV"></input>
       </form>
 
-      <p>{{ display }}<p>
+      {% if sources %}
+      <p>You searched for {{ query }}. The {{ qtype }} {{ media['title'] }} (<a href='http://www.imdb.com/title/{{ media['imdb'] }}'>imdb</a>) is available on these streaming services:</p>
 
       <ul>
       {% for source in sources %}
@@ -23,5 +24,18 @@
       {% endfor %}
       </ul>
 
+      <p>
+      ...or did you mean?: 
+      {% for other in other_results[:3] %}
+      {{ other }}
+      {% endfor %}
+      </p>
+
+      {% elif query %}
+      <p>The {{ qtype }} {{ query }} doesn't seem available on these streaming services.</p>
+      {% endif %}
+
+      <!-- <p>{{ footer }}</p> -->
+            
   </body>
 </html>

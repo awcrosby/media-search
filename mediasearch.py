@@ -5,6 +5,26 @@ from NetflixRoulette import *
 import guidebox
 
 def mediasearch(query, qtype):
+    #do search via guidebox, note: query='Terminator2', results: exact=0, fuzzy=1... use fuzzy and take first result
+    guidebox.api_key = json.loads(open('apikeys.json').read())["guidebox_prod_apikey"]
+    movies = guidebox.Search.movies(precision='fuzzy', field='title', query=query)
+
+    f = open( 'movies.txt', 'w' )
+    f.write( 'exact search, and results were > 0, query = ' + query + '\n dict = ' + repr(movies) + '\n' )
+    f.close()
+
+    gbid = movies['results'][0]['id']
+    media = guidebox.Movie.retrieve(id=gbid)  #dive deeper into api to find sources
+
+    #for websource in media['subscription_web_sources']:
+    #    sources.append(websource['source'])
+    #dont think we do this: if exact search has a result continue, else fuzzy and display "did you mean..."
+
+    #on link click continue
+    #pull movie info via guidebox, populate sources
+    #search netflixroulette with gb title
+
+    #==================================================
     sources = []
     try:  #NetflixRoulette search
         get_netflix_id(query)  #returns error if cannot find it netflix's library
@@ -24,9 +44,6 @@ def mediasearch(query, qtype):
             sources.append(websource['source'])
     except Exception:
         pass
-    f = open( 'movies.txt', 'w' )
-    f.write( 'dict = ' + repr(movies) + '\n' )
-    f.close()
     
     return sources
 
