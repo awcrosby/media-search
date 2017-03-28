@@ -5,37 +5,43 @@
   </head>
 
   <body>
-      <p>Check if Movie or TV Show is streaming on Netflix, HBO, Hulu, Amazon Prime, or Showtime</p>
-      <form action="/result" method="post">
-          <input type="text" name="movieq"></input>
-          <input type="submit" value="Search Movie"></input>
-      </form>
-      <form action="/result" method="post">
-          <input type="text" name="movieq"></input>
-          <input type="submit" value="Search TV"></input>
-      </form>
+    <p>Check if a movie is streaming on Netflix, HBO, Hulu, Amazon Prime, or Showtime</p>
+    <form action="/search" method="get">
+        <input type="text" name="q" value="{{ query }}" size=40></input>
+        <input type="submit" value="Search Movie"></input>
+    </form>
+    <!-- <form action="/result" method="post">
+        <input type="text" name="movieq"></input>
+        <input type="submit" value="Search TV"></input>
+    </form> -->
 
-      {% if sources %}
-      <p>You searched for {{ query }}. The {{ qtype }} {{ media['title'] }} (<a href='http://www.imdb.com/title/{{ media['imdb'] }}'>imdb</a>) is available on these streaming services:</p>
+    {% if (isresult and sources) %}  <!-- search result with source -->
+        <p>The {{ qtype }} {{ media['title'] }} ({{ media['release_year'] }})
+            <a href='http://www.imdb.com/title/{{ media['imdb'] }}'>imdb</a>
+            is available on these streaming services:</p>
 
-      <ul>
-      {% for source in sources %}
-        <li>{{ source }}</li>
-      {% endfor %}
-      </ul>
+        <ul>
+        {% for source in sources %}
+            <li>{{ source['name'] }} <a href="{{ source['link'] }}">go</a></li>
+        {% endfor %}
+        </ul>
+ 
+    {% elif isresult %}  <!-- search result without source -->
+        <p>The {{ qtype }} {{ media['title'] }} ({{ media['release_year'] }})
+            <a href='http://www.imdb.com/title/{{ media['imdb'] }}'>imdb</a>
+            doesn't seem available on these streaming services.</p>
 
-      <p>
-      ...or did you mean?: 
-      {% for other in other_results[:3] %}
-      {{ other }}
-      {% endfor %}
-      </p>
+    {% elif query %}  <!-- no search results after query was performed -->
+          <p>Your search for {{ query }} did not match any results.
+    {% endif %}
 
-      {% elif query %}
-      <p>The {{ qtype }} {{ query }} doesn't seem available on these streaming services.</p>
-      {% endif %}
-
-      <!-- <p>{{ footer }}</p> -->
-            
+    {% if other_results %}  <!-- lists other results if available -->
+        <p>...or did you mean?:
+        {% for item in other_results %}
+            <a href="{{ item['href'] }}">{{ item['title'] }}</a> &nbsp
+        {% endfor %}
+        </p>
+    {% endif %}
+    
   </body>
 </html>
