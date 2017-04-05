@@ -8,15 +8,15 @@
     <p>Check if a movie is streaming on Netflix, HBO, Hulu, Amazon Prime, or Showtime</p>
     <form action="/search" method="get">
         <input type="text" name="q" value="{{ query }}" size=40></input>
-        <input type="submit" value="Search Movie"></input>
+        <input type="submit" value="Search Movies"></input>
     </form>
-    <!-- <form action="/result" method="post">
-        <input type="text" name="movieq"></input>
-        <input type="submit" value="Search TV"></input>
-    </form> -->
+    <form action="/result" method="post">
+        <input type="text" name="showq" size=40></input>
+        <input type="submit" value="Search Shows"></input>
+    </form>
 
     {% if (isresult and sources) %}  <!-- search result with source -->
-        <p>The {{ qtype }} {{ media['title'] }} ({{ media['release_year'] }})
+        <p>The {{ qtype }} {{ media['title'] }} ({{ media['year'] }})
             <a href='http://www.imdb.com/title/{{ media['imdb'] }}'>imdb</a>
             is available on these streaming services:</p>
 
@@ -27,12 +27,12 @@
         </ul>
  
     {% elif isresult %}  <!-- search result without source -->
-        <p>The {{ qtype }} {{ media['title'] }} ({{ media['release_year'] }})
+        <p>The {{ qtype }} {{ media['title'] }} ({{ media['year'] }})
             <a href='http://www.imdb.com/title/{{ media['imdb'] }}'>imdb</a>
             doesn't seem available on these streaming services.</p>
 
     {% elif query %}  <!-- no search results after query was performed -->
-          <p>Your search for {{ query }} did not match any results.
+          <p>Your search for "{{ query }}" did not match any results.
     {% endif %}
 
     {% if other_results %}  <!-- lists other results if available -->
