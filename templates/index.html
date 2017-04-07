@@ -7,11 +7,11 @@
   <body>
     <p>Check if a movie is streaming on Netflix, HBO, Hulu, Amazon Prime, or Showtime</p>
     <form action="/search" method="get">
-        <input type="text" name="q" value="{{ query }}" size=40></input>
+        <input type="text" name="mq" value="{{ query }}" size=40></input>
         <input type="submit" value="Search Movies"></input>
     </form>
-    <form action="/result" method="post">
-        <input type="text" name="showq" size=40></input>
+    <form action="/search" method="get">
+        <input type="text" name="sq" size=40></input>
         <input type="submit" value="Search Shows"></input>
     </form>
 
@@ -22,7 +22,9 @@
 
         <ul>
         {% for source in sources %}
-            <li>{{ source['name'] }} <a href="{{ source['link'] }}">go</a></li>
+            <!--<li>{{ source['name'] }} <a href="{{ source['link'] }}">go</a></li>-->
+            <li>{{ sources[source]['name'] }}
+                <a href="{{ sources[source]['link'] }}">go</a></li>
         {% endfor %}
         </ul>
  

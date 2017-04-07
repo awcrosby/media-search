@@ -12,13 +12,20 @@ def home():
 
 @app.route('/search', methods=['GET'])
 def search():
-    query = request.args.get('q')  # or if POST: query = request.form['q']
-    if not query:  # exit early if query is blank
+    mquery = request.args.get('mq')  # or if POST: query = request.form['q']
+    squery = request.args.get('sq')
+    if mquery:
+        query = mquery
+        qtype = 'movie'
+    elif squery:
+        query = squery
+        qtype = 'show'
+    else: #if not (mquery or squery):  # exit early if query is blank
         return render_template('index.html')
     guidebox.api_key = json.loads(open('apikeys.json').read())["guidebox"]
-    sources = []
+    sources = {}
 
-    qtype = 'movie'  # temp hardcode query type
+    #qtype = 'movie'  # temp hardcode query type
     if qtype == 'movie':  # note: q='Terminator2' results exact=0 fuzzy=1
         medias = guidebox.Search.movies(precision='fuzzy', field='title', query=query)
         if not (medias['total_results'] > 0):  # exit early if no search results
@@ -28,26 +35,30 @@ def search():
 
         for websource in media['subscription_web_sources']:
             x = {'name': websource['source'], 'link': websource['link']}
-            sources.append(x)
-        med = {'title': media['title'], 'year': media['release_year'], 'imdb': media['imdb']}
+            sources[websource['source']] = x
+        med = {'title': media['title'], 'year': media['release_year'],
+               'imdb': media['imdb']}
     elif qtype == 'show':
         medias = guidebox.Search.shows(precision='fuzzy', field='title', query=query)
         if not (medias['total_results'] > 0):  # exit early if no search results
             return render_template('index.html', isresult=0, query=query, qtype=qtype)
         gbid = medias['results'][0]['id']  # take first result
-        media = guidebox.Show.available_content(id=gbid)  # more info on show
+        media = guidebox.Show.episodes(id=gbid, include_links=True)
 
-        #media = guidebox.Show.retrieve(id=gbid)  # get more info on movie
-        #f = open('singlemedia.txt', 'w')
-        #f.write('dict = ' + repr(media) + '\n')
-        #f.close()
+        for result in media['results']:  # go thru every episode and add source
+            for websource in result['subscription_web_sources']:
+                x = {'name': websource['source'], 'link': websource['link']}
+                sources[websource['source']] = x
 
-        for allsource in media['results']['web']['episodes']['all_sources']:
-            if allsource['type'] == 'subscription':
-                x = {'name': allsource['source'], 'link': 'none'}
-                sources.append(x)
+        #media = guidebox.Show.available_content(id=gbid)  # non-episode method
+        #for allsource in media['results']['web']['episodes']['all_sources']:
+        #    if allsource['type'] == 'subscription':
+        #        x = {'name': allsource['source'], 'link': 'none'}
+        #        sources.append(x)
+
         m = medias['results'][0]
-        med = {'title': m['title'], 'year': m['first_aired'][:4], 'imdb': m['imdb_id']}
+        med = {'title': m['title'], 'year': m['first_aired'][:4],
+               'imdb': m['imdb_id']}
 
     # alter display name of sources and limit what is displayed
     mapping = {'netflix': 'Netflix',
@@ -55,17 +66,17 @@ def search():
                'hulu_plus': 'Hulu',
                'amazon_prime': 'Amazon Prime',
                'showtime_subscription': 'Showtime (and Amazon/Hulu + Showtime)'}
-    for source in sources:
-        if source['name'] in mapping.keys():
-            source['name'] = mapping[source['name']]
+    for s in sources:
+        if sources[s]['name'] in mapping.keys():
+            sources[s]['name'] = mapping[sources[s]['name']]
         else:
             # sources.remove(source)
-            source['name'] = '~' + source['name']
+            sources[s]['name'] = '~' + sources[s]['name']
 
     # build other results to send to template
     other_results = []
     for m in medias['results'][1:]:
-        x = {'href': 'search?q=' + str(m['title']), 'title': str(m['title'])}
+        x = {'href': 'search?mq=' + str(m['title']), 'title': str(m['title'])}
         if(m['wikipedia_id'] != 0):  # filters out the very obscure
             other_results.append(x)
 
