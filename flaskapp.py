@@ -2,6 +2,7 @@
 from flask import Flask, render_template, request, redirect, url_for
 import json
 import guidebox
+import time
 app = Flask(__name__)
 
 
@@ -12,20 +13,14 @@ def home():
 
 @app.route('/search', methods=['GET'])
 def search():
-    mquery = request.args.get('mq')  # or if POST: query = request.form['q']
-    squery = request.args.get('sq')
-    if mquery:
-        query = mquery
-        qtype = 'movie'
-    elif squery:
-        query = squery
-        qtype = 'show'
-    else: #if not (mquery or squery):  # exit early if query is blank
+    query = request.args.get('q')  # or if POST: query = request.form['q']
+    qtype = 'movie'  # set default value if not included
+    qtype = request.args.get('type')
+    if not query:  # exit early if query is blank
         return render_template('index.html')
     guidebox.api_key = json.loads(open('apikeys.json').read())["guidebox"]
     sources = {}
 
-    #qtype = 'movie'  # temp hardcode query type
     if qtype == 'movie':  # note: q='Terminator2' results exact=0 fuzzy=1
         medias = guidebox.Search.movies(precision='fuzzy', field='title', query=query)
         if not (medias['total_results'] > 0):  # exit early if no search results
@@ -43,12 +38,35 @@ def search():
         if not (medias['total_results'] > 0):  # exit early if no search results
             return render_template('index.html', isresult=0, query=query, qtype=qtype)
         gbid = medias['results'][0]['id']  # take first result
-        media = guidebox.Show.episodes(id=gbid, include_links=True)
+        media = guidebox.Show.episodes(id=gbid, include_links=True, limit=200)
+        
+        seasons = []
+        for x in media['results']:  # go thru every episode and add source
+            #for websource in x['subscription_web_sources']:
+            #    y = {'name': websource['source'], 'link': websource['link']}
+            #    sources[websource['source']] = y
+            #if x['season_number'] not in seasons:
+            #    seasons.append(x['season_number'])
+            
+            for websource in x['subscription_web_sources']:
+                if websource['source'] not in sources: # make new source entry
+                    y = {'name': websource['source'],
+                         'link': websource['link'],
+                         'epcount': 1,
+                         'seasons': set(str(x['season_number']))}
+                    sources[websource['source']] = y
+                else:  # increase epcount and ensure season is accounted for
+                    sources[websource['source']]['epcount'] += 1
+                    sources[websource['source']]['seasons'].add(str(x['season_number']))
+                    
 
-        for result in media['results']:  # go thru every episode and add source
-            for websource in result['subscription_web_sources']:
-                x = {'name': websource['source'], 'link': websource['link']}
-                sources[websource['source']] = x
+        print "resultcount = ", len(media['results'])
+        for x in sources:
+            print "source = " + sources[x]['name']
+            print "epcount = ", sources[x]['epcount']
+            print "seasons = ", sources[x]['seasons']
+        #source: name, link, ep, season[]
+        #sources['netflix'] = name:netflix, link:..., ep:#, season:[] 
 
         #media = guidebox.Show.available_content(id=gbid)  # non-episode method
         #for allsource in media['results']['web']['episodes']['all_sources']:

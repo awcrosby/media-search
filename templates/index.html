@@ -5,13 +5,15 @@
   </head>
 
   <body>
-    <p>Check if a movie is streaming on Netflix, HBO, Hulu, Amazon Prime, or Showtime</p>
+    <p>Check if a movie/show is streaming on Netflix, HBO, Hulu, Amazon Prime, or Showtime</p>
     <form action="/search" method="get">
-        <input type="text" name="mq" value="{{ query }}" size=40></input>
+        <input type="text" name="q" value="" size=40></input>
+        <input type="hidden" value="movie" name="type"> 
         <input type="submit" value="Search Movies"></input>
     </form>
     <form action="/search" method="get">
-        <input type="text" name="sq" size=40></input>
+        <input type="text" name="q" value="" size=40></input>
+        <input type="hidden" value="show" name="type"> 
         <input type="submit" value="Search Shows"></input>
     </form>
 
@@ -24,7 +26,10 @@
         {% for source in sources %}
             <!--<li>{{ source['name'] }} <a href="{{ source['link'] }}">go</a></li>-->
             <li>{{ sources[source]['name'] }}
-                <a href="{{ sources[source]['link'] }}">go</a></li>
+                <a href="{{ sources[source]['link'] }}">go</a>
+                {{ sources[source]['epcount'] }} episodes across seasons:
+                {{ ', '.join(sources[source]['seasons']) }}
+            </li>
         {% endfor %}
         </ul>
  
