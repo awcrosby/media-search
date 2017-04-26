@@ -14,15 +14,18 @@ def home():
 @app.route('/search', methods=['GET'])
 def search():
     query = request.args.get('q')  # or if POST: query = request.form['q']
-    qtype = request.args.get('type')
-    if (qtype != 'movie') & (qtype != 'show'):
-        qtype = 'movie'  # set default value if not included
+
+    # type param comes from either button display name or 'did you mean' links
+    qtype = 'show' if 'show' in request.args.get('type').lower() else 'movie'
+
     if not query:  # exit early if query is blank
         return render_template('index.html')
-    guidebox.api_key = json.loads(open('apikeys.json').read())["guidebox"]
+
+    guidebox.api_key = json.loads(open('apikeys.json').read())['guidebox']
     sources = {}
 
-    if qtype == 'movie':  # note: q='Terminator2' results exact=0 fuzzy=1
+    # if movie perform movie search
+    if qtype == 'movie':
         medias = guidebox.Search.movies(precision='fuzzy', field='title', query=query)
         if not (medias['total_results'] > 0):  # exit early if no search results
             return render_template('index.html', isresult=0, query=query, qtype=qtype)
@@ -36,6 +39,8 @@ def search():
                'year': media['release_year'],
                'imdb': media['imdb'],
                'img': media['poster_120x171']}
+
+    # if show perform show search across all episodes
     elif qtype == 'show':
         medias = guidebox.Search.shows(precision='fuzzy', field='title', query=query)
         if not (medias['total_results'] > 0):  # exit early if no search results
@@ -49,13 +54,32 @@ def search():
                     y = {'name': ws['source'],
                          'link': ws['link'],
                          'epcount': 1,
-                         'seasons': list(str(x['season_number']))}
+                         'seasons': list((x['season_number'], )) }  #1-tuple
                     sources[ws['source']] = y
                 else:  # increase epcount and ensure season is accounted for
                     sources[ws['source']]['epcount'] += 1
-                    if str(x['season_number']) not in sources[ws['source']]['seasons']:
-                        sources[ws['source']]['seasons'].append(str(x['season_number']))
-                sources[ws['source']]['seasons'].sort()
+                    if x['season_number'] not in sources[ws['source']]['seasons']:
+                        sources[ws['source']]['seasons'].append(x['season_number'])
+
+        for s in sources:  # go thru every source and clean seasons
+            sources[s]['seasons'].sort()  # sort the seasons
+            if 0 in sources[s]['seasons']:
+                sources[s]['seasons'].remove(0)
+            strseasons = list()  # convert to str so template can display
+            for x in sources[s]['seasons']:
+                strseasons.append(str(x))
+
+            # if seasons are contiguous, then make a range str
+            x, end = (0, 0)
+            lst = strseasons
+            for y in range(1, len(lst)-x):
+                if int(lst[x]) + y == int(lst[x+y]): end = y
+            if end:  # if first entry had contiguous
+                lst[x] = lst[x] + '-' + lst[end]
+                for z in range(x+1, end+1):
+                    del lst[x+1]
+
+            sources[s]['seasons'] = list(strseasons)  # overwrite w/ str list
 
         m = medias['results'][0]
         med = {'title': m['title'], 'year': m['first_aired'][:4],

@@ -1,4 +1,20 @@
-flask
-requests
-guidebox
-q
+appdirs==1.4.3
+click==6.7
+Flask==0.12
+guidebox==1.0.2
+itsdangerous==0.24
+Jinja2==2.9.5
+MarkupSafe==1.0
+packaging==16.8
+pep8==1.7.0
+pyparsing==2.2.0
+q==2.6
+requests==2.13.0
+six==1.10.0
+Werkzeug==0.12.1
+# Application_Pieces
+# Hosting: Digital Ocean, ubuntu
+# Webserver: flask
+# Application: python
+# UI: Jinja templates via flask, boilerplate CSS skeleton
+# APIs: Guidebox

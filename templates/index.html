@@ -1,24 +1,38 @@
 <!DOCTYPE html>
-<html>
-  <head>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
     <title>Media search</title>
-  </head>
+    <meta name="description" content="">
+    <meta name="author" content="">
 
-  <body>
-    <p>Check if a movie/show is streaming on Netflix, HBO, Hulu, Amazon Prime, or Showtime</p>
+    <!-- Mobile Specific Metas –––––––––– -->
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- FONT ––––––––––––––––––––––– -->
+    <link href="//fonts.googleapis.com/css?family=Raleway:400,300,600" rel="stylesheet" type="text/css">
+
+    <!-- CSS ––––––––––––––––––––––––––––
+    <link rel="stylesheet" href="css/normalize.css">
+    <link rel="stylesheet" href="css/skeleton.css"> -->
+    <link rel=stylesheet type=text/css href="{{ url_for('static', filename='normalize.css') }}">
+    <link rel=stylesheet type=text/css href="{{ url_for('static', filename='skeleton.css') }}">
+</head>
+
+<body>
+  <div class="container">
+    <div style="margin-top: 6%">
+        <h4>Check if a movie/show is streaming on Netflix, HBO, Hulu, Amazon Prime, or Showtime</h4>
+    </div>
+
     <form action="/search" method="get">
-        <input type="text" name="q" value="" size=40></input>
-        <input type="hidden" value="movie" name="type"> 
-        <input type="submit" value="Search Movies"></input>
-    </form>
-    <form action="/search" method="get">
-        <input type="text" name="q" value="" size=40></input>
-        <input type="hidden" value="show" name="type"> 
-        <input type="submit" value="Search Shows"></input>
+        <input type="text" class="u-full-width" placeholder="Terminator ... Mockingjay 2 ... Broad City" name="q" value="{{ query }}">
+        <input type="submit" class="button-primary" name="type" value="Search Movies">
+        <input type="submit" name="type" value="Search Shows (all episodes, slow)">
     </form>
 
     {% if (isresult and sources) %}  <!-- search result with source -->
-        <p>The {{ qtype }} {{ media['title'] }} ({{ media['year'] }})
+        <p>The {{ qtype }} <strong>{{ media['title'] }} ({{ media['year'] }})</strong>
             <a href='http://www.imdb.com/title/{{ media['imdb'] }}'>imdb</a>
             is available on these streaming services:</p>
 
@@ -26,10 +40,7 @@
 
         <ul>
         {% for source in sources %}
-            <!-- <li>{{ sources[source]['name'] }}
-                <a href="{{ sources[source]['link'] }}">go</a> -->
-            <li><a href="{{ sources[source]['link'] }}">
-                {{ sources[source]['name'] }}</a>
+            <li><a href="{{ sources[source]['link'] }}">{{ sources[source]['name'] }}</a>
                 {% if qtype == 'show' %}
                     - {{ sources[source]['epcount'] }} episodes in season(s):
                     {{ ', '.join(sources[source]['seasons']) }}
@@ -39,12 +50,12 @@
         </ul>
  
     {% elif isresult %}  <!-- search result without source -->
-        <p>The {{ qtype }} {{ media['title'] }} ({{ media['year'] }})
+        <p>The {{ qtype }} <strong>{{ media['title'] }} ({{ media['year'] }})</strong>
             <a href='http://www.imdb.com/title/{{ media['imdb'] }}'>imdb</a>
             doesn't seem available on these streaming services.</p>
 
     {% elif query %}  <!-- no search results -->
-          <p>Your search for "{{ query }}" did not match any results.
+          <p>Your search for "{{ query }}" did not match any {{ qtype }} results.
     {% endif %}
 
 
@@ -55,6 +66,8 @@
         {% endfor %}
         </p>
     {% endif %}
-    
-  </body>
+
+  </div>    
+</body>
+
 </html>
