@@ -3,6 +3,7 @@ from flask import Flask, render_template, request, redirect, url_for
 import json
 import guidebox
 import time
+import requests
 app = Flask(__name__)
 
 
@@ -46,10 +47,29 @@ def search():
         if not (medias['total_results'] > 0):  # exit early if no search results
             return render_template('index.html', isresult=0, query=query, qtype=qtype)
         gbid = medias['results'][0]['id']  # take first result
-        media = guidebox.Show.episodes(id=gbid, include_links=True, limit=250)
+
+        # use multilpe requests to get large datasets
+        media = guidebox.Show.episodes(id=gbid, include_links=True, limit=150)
+        m2 = guidebox.Show.episodes(id=gbid, include_links=True, offset=150, limit=150)
+        media['results'] += m2['results']
+        # 23 sec 150+150: 23sec & 40sec, 200+200: 35sec, 100+100+100: 36sec
+        # think 150+150 better than 200+200, but api may be sluggish at times,
+        # so try 25 chuncks automated, then 50 and 100 and do 3trials each interwoven
 
         for x in media['results']:  # go thru every episode and add source
+            # if x['season_number'] == 0: continue  # skips s0, slow 23s to 39s
             for ws in x['subscription_web_sources']:
+                if ws['source'] not in sources:  # make new source entry
+                    y = {'name': ws['source'],
+                         'link': ws['link'],
+                         'epcount': 1,
+                         'seasons': list((x['season_number'], )) }  #1-tuple
+                    sources[ws['source']] = y
+                else:  # increase epcount and ensure season is accounted for
+                    sources[ws['source']]['epcount'] += 1
+                    if x['season_number'] not in sources[ws['source']]['seasons']:
+                        sources[ws['source']]['seasons'].append(x['season_number'])
+            for ws in x['free_web_sources']:
                 if ws['source'] not in sources:  # make new source entry
                     y = {'name': ws['source'],
                          'link': ws['link'],
@@ -95,7 +115,11 @@ def search():
         if k in mapping.keys():
             sources[k]['name'] = mapping[k]
         else:
-            del sources[k]
+            #del sources[k]  # allow others for free, but clean up some
+            if sources[k]['name'] == 'showtime_amazon_prime': del sources[k]
+            elif sources[k]['name'] == 'hulu_with_showtime': del sources[k]
+            elif sources[k]['name'] == 'hbo_amazon_prime': del sources[k]
+
 
     # build other results to send to template
     other_results = []
@@ -118,4 +142,4 @@ def search():
                            other_results=other_results[:4], isresult=1)
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=8181)
+    app.run(debug=True, host='0.0.0.0', port=8181)

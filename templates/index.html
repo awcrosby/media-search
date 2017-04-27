@@ -21,33 +21,42 @@
 
 <body>
   <div class="container">
-    <div style="margin-top: 6%">
+    <div style="margin-top: 6%">  <!-- introduction -->
         <h4>Check if a movie/show is streaming on Netflix, HBO, Hulu, Amazon Prime, or Showtime</h4>
     </div>
 
-    <form action="/search" method="get">
-        <input type="text" class="u-full-width" placeholder="Terminator ... Mockingjay 2 ... Broad City" name="q" value="{{ query }}">
-        <input type="submit" class="button-primary" name="type" value="Search Movies">
-        <input type="submit" name="type" value="Search Shows (all episodes, slow)">
-    </form>
+    <div class="row">  <!-- search box and buttons-->
+        <form action="/search" method="get">
+        <div class="five columns" style="margin-right: 3px">
+            <input type="text" class="u-full-width" placeholder="Terminator ... Mockingjay 2 ... Broad City ...  InuYasha" name="q" value="{{ query }}">
+        </div>
+        <div class="seven columns" style="margin-left: 3px">
+            <input type="submit" class="button-primary" name="type" value="Search Movies">
+            <input type="submit" name="type" value="Search Shows">
+        </div>
+        </form>
+    </div>
 
     {% if (isresult and sources) %}  <!-- search result with source -->
         <p>The {{ qtype }} <strong>{{ media['title'] }} ({{ media['year'] }})</strong>
             <a href='http://www.imdb.com/title/{{ media['imdb'] }}'>imdb</a>
             is available on these streaming services:</p>
 
-        <!-- <img src="{{ media['img'] }}" /> -->
-
-        <ul>
-        {% for source in sources %}
-            <li><a href="{{ sources[source]['link'] }}">{{ sources[source]['name'] }}</a>
-                {% if qtype == 'show' %}
-                    - {{ sources[source]['epcount'] }} episodes in season(s):
-                    {{ ', '.join(sources[source]['seasons']) }}
-                {% endif %}
-            </li>
-        {% endfor %}
-        </ul>
+        <div>
+            <div class="u-pull-left" style="margin-right: 2%">
+                <img src="{{ media['img'] }}" />
+            </div>
+            <div> 
+                <ul style="list-style: disc inside"> {% for source in sources %}
+                    <li><a href="{{ sources[source]['link'] }}">{{ sources[source]['name'] }}</a>
+                    {% if qtype == 'show' %}
+                        - {{ sources[source]['epcount'] }} episodes in season(s):
+                        {{ ', '.join(sources[source]['seasons']) }}
+                    {% endif %}
+                    </li>
+                {% endfor %} </ul>
+            </div>
+        </div>
  
     {% elif isresult %}  <!-- search result without source -->
         <p>The {{ qtype }} <strong>{{ media['title'] }} ({{ media['year'] }})</strong>
@@ -58,13 +67,14 @@
           <p>Your search for "{{ query }}" did not match any {{ qtype }} results.
     {% endif %}
 
-
+    
     {% if other_results %}  <!-- lists other results if available -->
-        <p>...or did you mean?:
-        {% for item in other_results %}
-            <a href="{{ item['href'] }}">{{ item['title'] }}</a> &nbsp
-        {% endfor %}
-        </p>
+        <div class="u-cf" style="margin-bottom: 2rem">
+            <br/>...or did you mean?:
+            {% for item in other_results %}
+                <a href="{{ item['href'] }}">{{ item['title'] }}</a> &nbsp
+            {% endfor %}
+        </div>
     {% endif %}
 
   </div>    
