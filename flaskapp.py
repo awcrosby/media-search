@@ -4,6 +4,8 @@ import json
 import guidebox
 import time
 import requests
+import re
+import time
 app = Flask(__name__)
 
 
@@ -27,9 +29,11 @@ def search():
 
     # if movie perform movie search
     if qtype == 'movie':
-        medias = guidebox.Search.movies(precision='fuzzy', field='title', query=query)
+        medias = guidebox.Search.movies(precision='fuzzy',
+                                        field='title', query=query)
         if not (medias['total_results'] > 0):  # exit early if no search results
-            return render_template('index.html', isresult=0, query=query, qtype=qtype)
+            return render_template('index.html', isresult=0,
+                                   query=query, qtype=qtype)
         gbid = medias['results'][0]['id']  # take first result
         media = guidebox.Movie.retrieve(id=gbid)  # more info on movie
 
@@ -41,27 +45,40 @@ def search():
                'imdb': media['imdb'],
                'img': media['poster_120x171']}
 
-    # if show perform show search across all episodes
+    # if show then perform show search across all episodes
     elif qtype == 'show':
-        medias = guidebox.Search.shows(precision='fuzzy', field='title', query=query)
-        if not (medias['total_results'] > 0):  # exit early if no search results
-            return render_template('index.html', isresult=0, query=query, qtype=qtype)
+        start = time.time()
+        medias = guidebox.Search.shows(precision='fuzzy', field='title',
+                                       query=query)
+        if not (medias['total_results'] > 0):  # exit early if no results
+            return render_template('index.html', isresult=0,
+                                   query=query, qtype=qtype)
         gbid = medias['results'][0]['id']  # take first result
 
-        # use multilpe requests to get large datasets
-        media = guidebox.Show.episodes(id=gbid, include_links=True, limit=150)
-        m2 = guidebox.Show.episodes(id=gbid, include_links=True, offset=150, limit=150)
-        media['results'] += m2['results']
-        # 23 sec 150+150: 23sec & 40sec, 200+200: 35sec, 100+100+100: 36sec
-        # think 150+150 better than 200+200, but api may be sluggish at times,
-        # so try 25 chuncks automated, then 50 and 100 and do 3trials each interwoven
+        # get all episodes in 1 or 2 api requests, to reduce api wait time
+        media = guidebox.Show.episodes(id=gbid, limit=1)
+        results = media['total_results']
+        if results <= 200:
+            media = guidebox.Show.episodes(id=gbid, include_links=True,
+                                           limit=results)
+        else:
+            media = guidebox.Show.episodes(id=gbid, include_links=True,
+                                           limit = 200)
+            m2 = guidebox.Show.episodes(id=gbid, include_links=True,
+                                           limit = 200, offset=200)
+            media['results'] += m2['results']
+        api_time = time.time()
+        print 'api request time: ', api_time - start
 
-        for x in media['results']:  # go thru every episode and add source
-            # if x['season_number'] == 0: continue  # skips s0, slow 23s to 39s
+        # iterate all episodes, add source types: sub, free, tv_provider
+        for x in media['results']:
+            if x['season_number'] == 0:  # skips season 0 tv specials
+                continue
             for ws in x['subscription_web_sources']:
                 if ws['source'] not in sources:  # make new source entry
                     y = {'name': ws['source'],
                          'link': ws['link'],
+                         'type': 'subscription',
                          'epcount': 1,
                          'seasons': list((x['season_number'], )) }  #1-tuple
                     sources[ws['source']] = y
@@ -71,8 +88,25 @@ def search():
                         sources[ws['source']]['seasons'].append(x['season_number'])
             for ws in x['free_web_sources']:
                 if ws['source'] not in sources:  # make new source entry
-                    y = {'name': ws['source'],
+                    domain = re.findall('//(\S+?)/', ws['link'])[0]
+                    name = domain.split('.')[-2] + '.' + domain.split('.')[-1]
+                    y = {'name': name,
                          'link': ws['link'],
+                         'type': 'free',
+                         'epcount': 1,
+                         'seasons': list((x['season_number'], )) }  #1-tuple
+                    sources[ws['source']] = y
+                else:  # increase epcount and ensure season is accounted for
+                    sources[ws['source']]['epcount'] += 1
+                    if x['season_number'] not in sources[ws['source']]['seasons']:
+                        sources[ws['source']]['seasons'].append(x['season_number'])
+            for ws in x['tv_everywhere_web_sources']:
+                if ws['source'] not in sources:  # make new source entry
+                    domain = re.findall('//(\S+?)/', ws['link'])[0]
+                    name = domain.split('.')[-2] + '.' + domain.split('.')[-1]
+                    y = {'name': name,
+                         'link': ws['link'],
+                         'type': 'tv_provider',
                          'epcount': 1,
                          'seasons': list((x['season_number'], )) }  #1-tuple
                     sources[ws['source']] = y
@@ -81,53 +115,64 @@ def search():
                     if x['season_number'] not in sources[ws['source']]['seasons']:
                         sources[ws['source']]['seasons'].append(x['season_number'])
 
-        for s in sources:  # go thru every source and clean seasons
+        # after interating all episodes, clean the sources
+        for s in sources.keys():
             sources[s]['seasons'].sort()  # sort the seasons
-            if 0 in sources[s]['seasons']:
-                sources[s]['seasons'].remove(0)
-            strseasons = list()  # convert to str so template can display
+
+            # convert seasons to string so template can display
+            strseasons = list()
             for x in sources[s]['seasons']:
                 strseasons.append(str(x))
 
-            # if seasons are contiguous, then make a range str
+            # if seasons are contiguous, then make into a range
             x, end = (0, 0)
             lst = strseasons
             for y in range(1, len(lst)-x):
                 if int(lst[x]) + y == int(lst[x+y]): end = y
-            if end:  # if first entry had contiguous
+            if end:  # if first entry has subsequent contiguous
                 lst[x] = lst[x] + '-' + lst[end]
                 for z in range(x+1, end+1):
                     del lst[x+1]
 
             sources[s]['seasons'] = list(strseasons)  # overwrite w/ str list
 
+            # remove sources that do not work
+            if (sources[s]['name'] == unicode('cc.com') and
+                    sources[s]['type'] == 'tv_provider'):
+                    continue  #    del sources[s]
+            elif (sources[s]['name'] == unicode('directv.com') and
+                    sources[s]['type'] == 'free'):
+                del sources[s]
+            elif (sources[s]['name'] == unicode('fox.com') and
+                    sources[s]['type'] == 'tv_provider'):
+                del sources[s]
+
         m = medias['results'][0]
         med = {'title': m['title'], 'year': m['first_aired'][:4],
                'imdb': m['imdb_id'], 'img': m['artwork_208x117']}
 
     # alter display name of sources and limit what is displayed
-    mapping = {'netflix': 'Netflix',
-               'hbo_now': 'HBO (and Amazon + HBO)',
-               'hulu_plus': 'Hulu',
-               'amazon_prime': 'Amazon Prime',
-               'showtime_subscription': 'Showtime (and Amazon/Hulu + Showtime)'}
+    labels = {'netflix': 'Netflix',
+              'hbo_now': 'HBO (and Amazon + HBO)',
+              'hulu_plus': 'Hulu',
+              'amazon_prime': 'Amazon Prime',
+              'showtime_subscription': 'Showtime (and Amazon/Hulu + Showtime)'}
     for k in sources.keys():
-        if k in mapping.keys():
-            sources[k]['name'] = mapping[k]
+        if k in labels.keys():
+            sources[k]['name'] = labels[k]
         else:
             #del sources[k]  # allow others for free, but clean up some
             if sources[k]['name'] == 'showtime_amazon_prime': del sources[k]
             elif sources[k]['name'] == 'hulu_with_showtime': del sources[k]
             elif sources[k]['name'] == 'hbo_amazon_prime': del sources[k]
 
-
-    # build other results to send to template
+    # build other_results to send to template
     other_results = []
     for m in medias['results'][1:]:
         x = {'href': 'search?q=' + m['title'] + '&type=' + qtype,
              'title': m['title']}
-        if (m['wikipedia_id'] != 0) & (m['wikipedia_id'] is not None):
-            other_results.append(x)  # filters out the very obscure
+        if (m['wikipedia_id'] != 0) and (m['wikipedia_id'] is not None):
+            other_results.append(x)  # keep if not very obscure
 
     # temp debugging
     f = open('medias.txt', 'w')
