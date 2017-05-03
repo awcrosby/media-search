@@ -1,14 +1,37 @@
 IMG.logo {
     width: 50%;
+    height: 30px;
     display: block;
     margin-left: auto;
-    margin-right: auto }
+    margin-right: auto;
+    margin-bottom: 4px;
+    margin-top: 4px;
+ }
 
-.source {
-  display: inline-block;
-  position: relative;
-  width: 300px;
-  height: 110px;
-  margin: 3px;
-  border: solid 1px black;
+/* http://stackoverflow.com/questions/30930792/how-to-make-divs-that-automatically-wrap-to-the-next-row */
+DIV.source {
+    display: inline-block;
+    position: relative;
+    width: 250px;
+    height: 120px;
+    margin: 3px;
+    border: solid 1px black;
+    padding: 0px;
+    text-align: center;
+    vertical-align: top;
+}
+
+DIV.name {
+    font-weight: bold;
+    font-size: 125%;
+}
+
+DIV.typetvp {
+    background-color: indigo;
+    color: white;
+}
+
+DIV.typefree {
+    background-color: darkslategray;
+    color: white;
 }

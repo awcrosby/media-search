@@ -26,12 +26,13 @@ def search():
 
     guidebox.api_key = json.loads(open('apikeys.json').read())['guidebox']
     sources = {}
+    source_sub, source_free, source_tvp = ([], [], [])
 
     # if movie perform movie search
     if qtype == 'movie':
         medias = guidebox.Search.movies(precision='fuzzy',
                                         field='title', query=query)
-        if not (medias['total_results'] > 0):  # exit early if no search results
+        if not (medias['total_results'] > 0):  # exit early if no results
             return render_template('index.html', isresult=0,
                                    query=query, qtype=qtype)
         gbid = medias['results'][0]['id']  # take first result
@@ -77,6 +78,7 @@ def search():
             for ws in x['subscription_web_sources']:
                 if ws['source'] not in sources:  # make new source entry
                     y = {'name': ws['source'],
+                         'display_name': ws['display_name'],
                          'link': ws['link'],
                          'type': 'subscription',
                          'epcount': 1,
@@ -88,9 +90,8 @@ def search():
                         sources[ws['source']]['seasons'].append(x['season_number'])
             for ws in x['free_web_sources']:
                 if ws['source'] not in sources:  # make new source entry
-                    domain = re.findall('//(\S+?)/', ws['link'])[0]
-                    name = domain.split('.')[-2] + '.' + domain.split('.')[-1]
-                    y = {'name': name,
+                    y = {'name': ws['source'],
+                         'display_name': ws['display_name'],
                          'link': ws['link'],
                          'type': 'free',
                          'epcount': 1,
@@ -102,9 +103,8 @@ def search():
                         sources[ws['source']]['seasons'].append(x['season_number'])
             for ws in x['tv_everywhere_web_sources']:
                 if ws['source'] not in sources:  # make new source entry
-                    domain = re.findall('//(\S+?)/', ws['link'])[0]
-                    name = domain.split('.')[-2] + '.' + domain.split('.')[-1]
-                    y = {'name': name,
+                    y = {'name': ws['source'],
+                         'display_name': ws['display_name'],
                          'link': ws['link'],
                          'type': 'tv_provider',
                          'epcount': 1,
@@ -136,35 +136,35 @@ def search():
 
             sources[s]['seasons'] = list(strseasons)  # overwrite w/ str list
 
-            # remove sources that do not work
-            if (sources[s]['name'] == unicode('cc.com') and
-                    sources[s]['type'] == 'tv_provider'):
-                    continue  #    del sources[s]
-            elif (sources[s]['name'] == unicode('directv.com') and
-                    sources[s]['type'] == 'free'):
-                del sources[s]
-            elif (sources[s]['name'] == unicode('fox.com') and
-                    sources[s]['type'] == 'tv_provider'):
-                del sources[s]
-
         m = medias['results'][0]
         med = {'title': m['title'], 'year': m['first_aired'][:4],
                'imdb': m['imdb_id'], 'img': m['artwork_208x117']}
 
-    # alter display name of sources and limit what is displayed
-    labels = {'netflix': 'Netflix',
-              'hbo_now': 'HBO (and Amazon + HBO)',
-              'hulu_plus': 'Hulu',
-              'amazon_prime': 'Amazon Prime',
-              'showtime_subscription': 'Showtime (and Amazon/Hulu + Showtime)'}
+    # delete redundant hbo/showtime sources, and sources that don't work
     for k in sources.keys():
-        if k in labels.keys():
-            sources[k]['name'] = labels[k]
-        else:
-            #del sources[k]  # allow others for free, but clean up some
-            if sources[k]['name'] == 'showtime_amazon_prime': del sources[k]
-            elif sources[k]['name'] == 'hulu_with_showtime': del sources[k]
-            elif sources[k]['name'] == 'hbo_amazon_prime': del sources[k]
+        if sources[k]['name'] in ['showtime_amazon_prime',
+                                  'hulu_with_showtime',
+                                  'hbo_amazon_prime',
+                                  'showtime',  #tv_provider
+                                  'hbo',  #tv_provider
+                                  'directv_free',
+                                  'comedycentral_tveverywhere',
+                                  'fox_tveverywhere']:
+            del sources[k]
+
+    # for shows split sources into separate lists so template can display
+    if qtype == 'show':
+        source_sub = []
+        source_free = []
+        source_tvp = []
+
+        for s in sources:
+            if sources[s]['type'] == 'subscription':
+                source_sub.append(sources[s])
+            elif sources[s]['type'] == 'free':
+                source_free.append(sources[s])
+            elif sources[s]['type'] == 'tv_provider':
+                source_tvp.append(sources[s])
 
     # build other_results to send to template
     other_results = []
@@ -184,7 +184,9 @@ def search():
 
     return render_template('index.html', sources=sources, media=med,
                            query=query, qtype=qtype,
-                           other_results=other_results[:4], isresult=1)
+                           other_results=other_results[:4], isresult=1,
+                           source_sub=source_sub, source_free=source_free,
+                           source_tvp=source_tvp)
 
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0', port=8181)
