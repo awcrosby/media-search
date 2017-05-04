@@ -47,10 +47,9 @@
         </div>
     </div>
     <div class="u-cf" style="margin-bottom: 15px" />
-    <br />
+    <br>
 
-    {% if (qtype == 'show') and source_sub %}  <!-- sub show source boxes -->
-        <!-- <div class="u-cf" style="margin-top: 15px">Subscription:</div> -->
+    {% if source_sub %}  <!-- subscription source boxes -->
         {% for s in source_sub %}
             <div class="source">
                 {% if s['name'] == 'netflix' %}
@@ -63,83 +62,60 @@
                     <img class="logo" src="{{ url_for('static', filename='hbo_logo.png') }}" />
                 {% elif s['name'] == 'showtime_subscription' %}
                     <img class="logo" src="{{ url_for('static', filename='showtime_logo.png') }}" />
+                {% else %} <!-- this is an unknown subscription source -->
+                    <div class="typefree">Stream with Subscription</div>
+                    <div class="name">{{ s['display_name'] }}</div>
                 {% endif %}
-                {{ s['epcount'] }} <a href={{ s['link'] }}>episodes</a>
-                in season(s): {{ ', '.join(s['seasons']) }}
+                {% if qtype == 'show' %}
+                    <div class="sourceinfo">{{ s['epcount'] }} <a href={{ s['link'] }}>episodes</a>
+                    in season(s): {{ ', '.join(s['seasons']) }}</div>
+                {% else %}
+                    <div class="sourceinfo">Stream <a href={{ s['link'] }}>movie</a> on {{ s['display_name'] }}</div>
+                {% endif %}
+                <!-- placeholder links for testing
+                {% if s['name'] == 'amazon_prime' %}
+                    <div class="sourceinfo"><a href='test'>Watch free with 30-day trial</a></div>
+                {% elif s['name'] == 'hbo_now' %}
+                    <div class="sourceinfo"><a href='test'>Get HBO on your Amz Prime</a></div>
+                    <div class="sourceinfo">Stream on <a href='test'>HBO Now</a> or <a href='test'>HBO Go</a> with TV provider login</div>
+                {% elif s['name'] == 'showtime_subscription' %}
+                    <div class="sourceinfo"><a href='test'>Get Showtime on your Amz Prime</a></div>
+                    <div class="sourceinfo">Stream on <a href='test'>Showtime</a> or <a href='test'>Showtime Anytime</a> with TV provider login</div>
+                {% elif s['type'] == 'tv_provider' %}
+                    <div class="sourceinfo">Stream with your cable/sat TV account if you have this channel</div>
+                {% endif %} -->
             </div>
         {% endfor %}
     {% endif %}
     {% if (qtype == 'show') and source_free %}  <!-- free show source boxes -->
-        <!-- <div class="u-cf" style="margin-top: 15px">Free Streaming:</div> -->
         {% for s in source_free %}
             <div class="source">
                 <div class="typefree">Free Streaming</div>
                 <div class="name">{{ s['display_name'] }}</div>
-                {{ s['epcount'] }} <a href={{ s['link'] }}>episodes</a>
-                in season(s): {{ ', '.join(s['seasons']) }}
+                <div class="sourceinfo">{{ s['epcount'] }} <a href={{ s['link'] }}>episodes</a>
+                in season(s): {{ ', '.join(s['seasons']) }}</div>
             </div>
         {% endfor %}
     {% endif %}
     {% if (qtype == 'show') and source_tvp %}  <!-- tv_provider show source boxes -->
-        <!-- <div class="u-cf" style="margin-top: 15px">Stream with TV Provider Login:</div> -->
         {% for s in source_tvp %}
             <div class="source">
                 <div class="typetvp">Stream with TV Provider Login</div>
                 <div class="name">{{ s['display_name'] }}</div>
-                {{ s['epcount'] }} <a href={{ s['link'] }}>episodes</a>
-                in season(s): {{ ', '.join(s['seasons']) }}
+                <div class="sourceinfo">{{ s['epcount'] }} <a href={{ s['link'] }}>episodes</a>
+                in season(s): {{ ', '.join(s['seasons']) }}</div>
+                <div class="sourceinfo">Stream with your cable/sat TV account if you have this channel</div>
             </div>
         {% endfor %}
     {% endif %}
-    {% if qtype == 'movie' %}  <!-- movie source boxes -->
-        <div class="u-cf" style="margin-top: 15px">Subscription:</div>
-        {% for s in sources %}
-            <div class="source">    
-                <a href="{{ sources[s]['link'] }}">{{ sources[s]['name'] }}</a>
-            </div>        
-        {% endfor %}
-    {% endif %}
-
     <div class="u-cf" style="margin-bottom: 15px"></div>
 
-            <!--
-        <div>
-            {% if qtype == 'show'%}
-                <div> <ul style="list-style: disc inside"> {% for s in sources %}
-                    {% if sources[s]['type'] == 'subscription' %}
-                        <li><strong>Subscription:</strong> {{ sources[s]['name'] }}
-                            - {{ sources[s]['epcount'] }}
-                            <a href={{ sources[s]['link'] }}>episodes</a>
-                            in season(s): 
-                            {{ ', '.join(sources[s]['seasons']) }}
-                    {% endif %}
-                    {% if sources[s]['type'] == 'free' %}
-                        <li><strong>Free stream:</strong> {{ sources[s]['name'] }}
-                            - {{ sources[s]['epcount'] }}
-                            <a href={{ sources[s]['link'] }}>episodes</a>
-                            in season(s): 
-                            {{ ', '.join(sources[s]['seasons']) }}
-                    {% endif %}
-                    {% if sources[s]['type'] == 'tv_provider' %}
-                        <li><strong>TV Provider login:</strong> {{ sources[s]['name'] }}
-                            - {{ sources[s]['epcount'] }}
-                            <a href={{ sources[s]['link'] }}>episodes</a>
-                            in season(s): 
-                            {{ ', '.join(sources[s]['seasons']) }}
-                    {% endif %}
-                {% endfor %} </ul> </div>
-            {% else %}
-                <ul style="list-style: disc inside"> {% for s in sources %}
-                    <li><a href="{{ sources[s]['link'] }}">{{ sources[s]['name'] }}</a>
-                    </li>
-                {% endfor %} </ul>
-            {% endif %}
-        </div> -->
  
     {% elif isresult %}  <!-- display if search result without source -->
         <p>The {{ qtype }} <strong>{{ media['title'] }} ({{ media['year'] }})</strong>
             <a href='http://www.imdb.com/title/{{ media['imdb'] }}'>imdb</a>
             doesn't seem available on these streaming services.</p>
+
 
     {% elif query %}  <!-- display if no search results -->
           <p>Your search for "{{ query }}" did not match any {{ qtype }} results.
@@ -148,7 +124,7 @@
     
     {% if other_results %}  <!-- list of other results if available -->
         <div class="u-cf" style="margin-bottom: 2rem">
-            <br/>...or did you mean?:
+            <br>...or did you mean?:
             {% for item in other_results %}
                 <a href="{{ item['href'] }}">{{ item['title'] }}</a> &nbsp
             {% endfor %}

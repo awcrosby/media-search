@@ -39,8 +39,11 @@ def search():
         media = guidebox.Movie.retrieve(id=gbid)  # more info on movie
 
         for ws in media['subscription_web_sources']:
-            x = {'name': ws['source'], 'link': ws['link']}
-            sources[ws['source']] = x
+            y = {'name': ws['source'],
+                 'display_name': ws['display_name'],
+                 'link': ws['link'],
+                 'type': 'subscription'}
+            sources[ws['source']] = y
         med = {'title': media['title'],  # create to send to template
                'year': media['release_year'],
                'imdb': media['imdb'],
@@ -142,9 +145,9 @@ def search():
 
     # delete redundant hbo/showtime sources, and sources that don't work
     for k in sources.keys():
-        if sources[k]['name'] in ['showtime_amazon_prime',
+        if sources[k]['name'] in ['hbo_amazon_prime',
+                                  'showtime_amazon_prime',
                                   'hulu_with_showtime',
-                                  'hbo_amazon_prime',
                                   'showtime',  #tv_provider
                                   'hbo',  #tv_provider
                                   'directv_free',
@@ -153,7 +156,8 @@ def search():
             del sources[k]
 
     # for shows split sources into separate lists so template can display
-    if qtype == 'show':
+    #if qtype == 'show':
+    if True:
         source_sub = []
         source_free = []
         source_tvp = []

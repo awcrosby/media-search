@@ -1,20 +1,17 @@
 IMG.logo {
     width: 50%;
-    height: 30px;
+    height: 49px;
     display: block;
-    margin-left: auto;
-    margin-right: auto;
-    margin-bottom: 4px;
-    margin-top: 4px;
+    margin: 4px auto 4px auto;  /* top right bottom left */
  }
 
 /* http://stackoverflow.com/questions/30930792/how-to-make-divs-that-automatically-wrap-to-the-next-row */
 DIV.source {
     display: inline-block;
     position: relative;
-    width: 250px;
-    height: 120px;
-    margin: 3px;
+    width: 252px;
+    height: 168px;
+    margin: 0px 6px 10px 0px;  /* top right bottom left */
     border: solid 1px black;
     padding: 0px;
     text-align: center;
@@ -27,11 +24,19 @@ DIV.name {
 }
 
 DIV.typetvp {
-    background-color: indigo;
+    /* background-color: indigo;
+    background-color: brown; */ 
+    background-color: rebeccapurple;
+    /* background-color: slateblue; */
     color: white;
 }
 
 DIV.typefree {
-    background-color: darkslategray;
+    /* background-color: darkslategray; */
+    background-color: sienna;
     color: white;
+}
+
+DIV.sourceinfo {
+    margin: 3px 0px 6px 0px;  /* top right bottom left */
 }
