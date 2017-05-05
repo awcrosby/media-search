@@ -26,6 +26,7 @@ def search():
 
     guidebox.api_key = json.loads(open('apikeys.json').read())['guidebox']
     sources = {}
+    src, epcount, seasons = ([], {}, {})
     source_sub, source_free, source_tvp = ([], [], [])
 
     # if movie perform movie search
@@ -44,7 +45,10 @@ def search():
                  'link': ws['link'],
                  'type': 'subscription'}
             sources[ws['source']] = y
-        med = {'title': media['title'],  # create to send to template
+            src.append(y)
+
+        # set media info to send to template
+        med = {'title': media['title'],
                'year': media['release_year'],
                'imdb': media['imdb'],
                'img': media['poster_120x171']}
@@ -67,108 +71,86 @@ def search():
                                            limit=results)
         else:
             media = guidebox.Show.episodes(id=gbid, include_links=True,
-                                           limit = 200)
+                                           limit=200)
             m2 = guidebox.Show.episodes(id=gbid, include_links=True,
-                                           limit = 200, offset=200)
+                                        limit=200, offset=200)
             media['results'] += m2['results']
         api_time = time.time()
         print 'api request time: ', api_time - start
 
         # iterate all episodes, add source types: sub, free, tv_provider
-        for x in media['results']:
-            if x['season_number'] == 0:  # skips season 0 tv specials
+        for ep in media['results']:
+            if ep['season_number'] == 0:  # skips season 0 tv specials
                 continue
-            for ws in x['subscription_web_sources']:
-                if ws['source'] not in sources:  # make new source entry
-                    y = {'name': ws['source'],
-                         'display_name': ws['display_name'],
-                         'link': ws['link'],
-                         'type': 'subscription',
-                         'epcount': 1,
-                         'seasons': list((x['season_number'], )) }  #1-tuple
-                    sources[ws['source']] = y
-                else:  # increase epcount and ensure season is accounted for
-                    sources[ws['source']]['epcount'] += 1
-                    if x['season_number'] not in sources[ws['source']]['seasons']:
-                        sources[ws['source']]['seasons'].append(x['season_number'])
-            for ws in x['free_web_sources']:
-                if ws['source'] not in sources:  # make new source entry
-                    y = {'name': ws['source'],
-                         'display_name': ws['display_name'],
-                         'link': ws['link'],
-                         'type': 'free',
-                         'epcount': 1,
-                         'seasons': list((x['season_number'], )) }  #1-tuple
-                    sources[ws['source']] = y
-                else:  # increase epcount and ensure season is accounted for
-                    sources[ws['source']]['epcount'] += 1
-                    if x['season_number'] not in sources[ws['source']]['seasons']:
-                        sources[ws['source']]['seasons'].append(x['season_number'])
-            for ws in x['tv_everywhere_web_sources']:
-                if ws['source'] not in sources:  # make new source entry
-                    y = {'name': ws['source'],
-                         'display_name': ws['display_name'],
-                         'link': ws['link'],
-                         'type': 'tv_provider',
-                         'epcount': 1,
-                         'seasons': list((x['season_number'], )) }  #1-tuple
-                    sources[ws['source']] = y
-                else:  # increase epcount and ensure season is accounted for
-                    sources[ws['source']]['epcount'] += 1
-                    if x['season_number'] not in sources[ws['source']]['seasons']:
-                        sources[ws['source']]['seasons'].append(x['season_number'])
 
-        # after interating all episodes, clean the sources
-        for s in sources.keys():
-            sources[s]['seasons'].sort()  # sort the seasons
+            source_types = ['subscription_web_sources',
+                            'free_web_sources',
+                            'tv_everywhere_web_sources']
+            for source_type in source_types:
+                for s in ep[source_type]:
+                    if not any(d.get('name', None) == s['source'] for d in src):
+                        newsource = {'name': s['source'],
+                                     'display_name': s['display_name'],
+                                     'link': s['link'],
+                                     'type': source_type,
+                                     'seasons': list((ep['season_number'], ))}  # 1-tuple TODO remove
+                        src.append(newsource)
+                        seasons[s['source']] = []
+                    # create or update epcount, append season to list if not there
+                    epcount[s['source']] = epcount.get(s['source'],0) + 1
+                    if ep['season_number'] not in seasons[s['source']]:
+                        seasons[s['source']].append(ep['season_number'])
+        print 'episode proc time: ', time.time() - api_time
+
+        # for each source, set episode count and seasons
+        for s in src:
+            s['epcount'] = epcount[s['name']]  # set the source dict epcount
+            s['seasons'] = seasons[s['name']]  # set the source dict seasons 
+            s['seasons'].sort()  # sort the seasons
 
             # convert seasons to string so template can display
-            strseasons = list()
-            for x in sources[s]['seasons']:
+            strseasons = list()  #TODO see if can use list already in dict here
+            for x in s['seasons']:
                 strseasons.append(str(x))
 
             # if seasons are contiguous, then make into a range
             x, end = (0, 0)
             lst = strseasons
             for y in range(1, len(lst)-x):
-                if int(lst[x]) + y == int(lst[x+y]): end = y
+                if int(lst[x]) + y == int(lst[x+y]):
+                    end = y
             if end:  # if first entry has subsequent contiguous
                 lst[x] = lst[x] + '-' + lst[end]
                 for z in range(x+1, end+1):
                     del lst[x+1]
 
-            sources[s]['seasons'] = list(strseasons)  # overwrite w/ str list
+            s['seasons'] = list(strseasons)  # overwrite w/ str list
 
+        # set media info to send to template
         m = medias['results'][0]
         med = {'title': m['title'], 'year': m['first_aired'][:4],
                'imdb': m['imdb_id'], 'img': m['artwork_208x117']}
 
     # delete redundant hbo/showtime sources, and sources that don't work
-    for k in sources.keys():
+    for k in sources.keys():  #TODO update this
         if sources[k]['name'] in ['hbo_amazon_prime',
                                   'showtime_amazon_prime',
                                   'hulu_with_showtime',
-                                  'showtime',  #tv_provider
-                                  'hbo',  #tv_provider
+                                  'showtime',  # tv_provider
+                                  'hbo',  # tv_provider
                                   'directv_free',
                                   'comedycentral_tveverywhere',
                                   'fox_tveverywhere']:
             del sources[k]
 
-    # for shows split sources into separate lists so template can display
-    #if qtype == 'show':
-    if True:
-        source_sub = []
-        source_free = []
-        source_tvp = []
-
-        for s in sources:
-            if sources[s]['type'] == 'subscription':
-                source_sub.append(sources[s])
-            elif sources[s]['type'] == 'free':
-                source_free.append(sources[s])
-            elif sources[s]['type'] == 'tv_provider':
-                source_tvp.append(sources[s])
+    # split sources into separate lists
+    for s in src:
+        if s['type'] == 'subscription_web_sources':
+            source_sub.append(s)
+        elif s['type'] == 'free_web_sources':
+            source_free.append(s)
+        elif s['type'] == 'tv_everywhere_web_sources':
+            source_tvp.append(s)
 
     # build other_results to send to template
     other_results = []
@@ -186,7 +168,7 @@ def search():
     f.write('dict = ' + repr(media) + '\n')
     f.close()
 
-    return render_template('index.html', sources=sources, media=med,
+    return render_template('index.html', sources=src, media=med,
                            query=query, qtype=qtype,
                            other_results=other_results[:4], isresult=1,
                            source_sub=source_sub, source_free=source_free,
