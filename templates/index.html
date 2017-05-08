@@ -1,137 +1,128 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <title>Media search</title>
-    <meta name="description" content="">
-    <meta name="author" content="">
+{% extends 'layout.html' %}
 
-    <!-- Mobile Specific Metas –––––––––– -->
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-
-    <!-- FONT ––––––––––––––––––––––– -->
-    <link href="//fonts.googleapis.com/css?family=Raleway:400,300,600" rel="stylesheet" type="text/css">
-
-    <!-- CSS –––––––––––––––––––––––––––– -->
-    <link rel=stylesheet type=text/css href="{{ url_for('static', filename='normalize.css') }}">
-    <link rel=stylesheet type=text/css href="{{ url_for('static', filename='skeleton.css') }}"> 
-    <link rel=stylesheet type=text/css href="{{ url_for('static', filename='media_search.css') }}">
-</head>
-
-<body>
-  <div class="container">
+{% block body %}
     <div style="margin-top: 6%">  <!-- introduction -->
-        <h4>Find if a movie/show is streaming on Netflix, HBO, Hulu, Amazon Prime, or Showtime</h4>
+      <h4>Find if a movie/show is streaming on Netflix, HBO, Hulu, Amazon Prime, or Showtime</h4>
     </div>
 
     <div class="row">  <!-- search box and buttons-->
-        <form action="/search" method="get">
+      <form action="/search" method="get">
         <div class="five columns" style="margin-right: 3px">
-            <input type="text" class="u-full-width" placeholder="Terminator ... Mockingjay 2 ... Broad City ...  InuYasha" name="q" value="{{ query }}" autofocus>
+          <input type="text" class="u-full-width" placeholder="Terminator ... Mockingjay 2 ... Broad City ...  InuYasha" name="q" value="{{ query }}" autofocus>
         </div>
         <div class="seven columns" style="margin-left: 3px">
-            <input type="submit" class="button-primary" name="type" value="Search Movies">
-            <input type="submit" name="type" value="Search Shows">
+          <input type="submit" class="button-primary" name="type" value="Search Movies">
+          <input type="submit" name="type" value="Search Shows">
         </div>
-        </form>
+      </form>
     </div>
 
-    {% if (isresult and sources) %}  <!-- display if search result plus source -->
-
-    <div style="margin-top: 15px">  <!-- box with media image and description -->
-        <img class="u-pull-left" style="margin-right: 2%" src="{{ media['img'] }}" />
-        <div>
+    <!-- end-result-ui: a source was found -->
+    {% if (source_sub or source_free or source_tvp) %}
+        <div style="margin-top: 15px">  <!-- box with media image and description -->
+          <img class="u-pull-left" style="margin-right: 2%" src="{{ media['img'] }}" alt="Media result image" />
+          <div>
             The {{ qtype }} <strong>{{ media['title'] }} ({{ media['year'] }})</strong>
             <a href='http://www.imdb.com/title/{{ media['imdb'] }}'>imdb</a>
             is available on these streaming services:
+          </div>
         </div>
-    </div>
-    <div class="u-cf" style="margin-bottom: 15px" />
-    <br>
+        <div class="u-cf" style="margin-bottom: 15px"></div>
+        <br>
 
-    {% if source_sub %}  <!-- subscription source boxes -->
-        {% for s in source_sub %}
+        {% for s in source_sub %}  <!-- subscription source boxes -->
             <div class="source">
-                {% if s['name'] == 'netflix' %}
-                    <img class="logo" src="{{ url_for('static', filename='netflix_logo.png') }}" />
-                {% elif s['name'] == 'hulu_plus' %}
-                    <img class="logo" src="{{ url_for('static', filename='hulu_logo.png') }}" />
-                {% elif s['name'] == 'amazon_prime' %}
-                    <img class="logo" src="{{ url_for('static', filename='amz_prime_blue.jpg') }}" />
-                {% elif s['name'] == 'hbo_now' %}
-                    <img class="logo" src="{{ url_for('static', filename='hbo_logo.png') }}" />
-                {% elif s['name'] == 'showtime_subscription' %}
-                    <img class="logo" src="{{ url_for('static', filename='showtime_logo.png') }}" />
-                {% else %} <!-- this is an unknown subscription source -->
-                    <div class="typefree">Stream with Subscription</div>
-                    <div class="name">{{ s['display_name'] }}</div>
-                {% endif %}
-                {% if qtype == 'show' %}
-                    <div class="sourceinfo">{{ s['epcount'] }} <a href={{ s['link'] }}>episodes</a>
-                    in season(s): {{ ', '.join(s['seasons']) }}</div>
-                {% else %}
-                    <div class="sourceinfo">Stream <a href={{ s['link'] }}>movie</a> on {{ s['display_name'] }}</div>
-                {% endif %}
-                <!-- placeholder links for testing
-                {% if s['name'] == 'amazon_prime' %}
-                    <div class="sourceinfo"><a href='test'>Watch free with 30-day trial</a></div>
-                {% elif s['name'] == 'hbo_now' %}
-                    <div class="sourceinfo"><a href='test'>Get HBO on your Amz Prime</a></div>
-                    <div class="sourceinfo">Stream on <a href='test'>HBO Now</a> or <a href='test'>HBO Go</a> with TV provider login</div>
-                {% elif s['name'] == 'showtime_subscription' %}
-                    <div class="sourceinfo"><a href='test'>Get Showtime on your Amz Prime</a></div>
-                    <div class="sourceinfo">Stream on <a href='test'>Showtime</a> or <a href='test'>Showtime Anytime</a> with TV provider login</div>
-                {% elif s['type'] == 'tv_provider' %}
-                    <div class="sourceinfo">Stream with your cable/sat TV account if you have this channel</div>
-                {% endif %} -->
+              {% if s['source'] == 'netflix' %}
+                  <img class="logo" src="{{ url_for('static', filename='netflix_logo.png') }}" alt="Netflix logo" />
+              {% elif s['source'] == 'hulu_plus' %}
+                  <img class="logo" src="{{ url_for('static', filename='hulu_logo.png') }}" alt="Hulu logo" />
+              {% elif s['source'] == 'amazon_prime' %}
+                  <img class="logo" src="{{ url_for('static', filename='amz_prime_blue.jpg') }}" alt="Amazon Prime logo"  />
+              {% elif s['source'] == 'hbo_now' %}
+                  <img class="logo" src="{{ url_for('static', filename='hbo_logo.png') }}" alt="HBO logo" />
+              {% elif s['source'] == 'showtime_subscription' %}
+                  <img class="logo" src="{{ url_for('static', filename='showtime_logo.png') }}" alt="Showtime logo" />
+              {% else %} <!-- this is an unknown subscription source -->
+                  <div class="typefree">Stream with Subscription</div>
+                  <div class="name">{{ s['display_name'] }}</div>
+              {% endif %}
+              {% if qtype == 'show' %}
+                  <div class="sourceinfo">
+                    {{ s['epcount'] }} <a href={{ s['link'] }}>episodes</a>
+                    in season(s): {{ ', '.join(s['seasons']) }}
+                  </div>
+              {% else %}
+                  <div class="sourceinfo">Stream <a href={{ s['link'] }}>movie</a> on {{ s['display_name'] }}</div>
+              {% endif %}
+              <!-- placeholder links for testing
+              {% if s['source'] == 'amazon_prime' %}
+                  <div class="sourceinfo"><a href='test'>Watch free with 30-day trial</a></div>
+              {% elif s['source'] == 'hbo_now' %}
+                  <div class="sourceinfo"><a href='test'>Get HBO on your Amz Prime</a></div>
+                  <div class="sourceinfo">Stream on <a href='test'>HBO Now</a> or <a href='test'>HBO Go</a> with TV provider login</div>
+              {% elif s['source'] == 'showtime_subscription' %}
+                  <div class="sourceinfo"><a href='test'>Get Showtime on your Amz Prime</a></div>
+                  <div class="sourceinfo">Stream on <a href='test'>Showtime</a> or <a href='test'>Showtime Anytime</a> with TV provider login</div>
+              {% elif s['type'] == 'tv_provider' %}
+                  <div class="sourceinfo">Stream with your cable/sat TV account if you have this channel</div>
+              {% endif %} -->
             </div>
         {% endfor %}
-    {% endif %}
-    {% if (qtype == 'show') and source_free %}  <!-- free show source boxes -->
-        {% for s in source_free %}
+
+        {% for s in source_free %}  <!-- free show source boxes -->
             <div class="source">
-                <div class="typefree">Free Streaming</div>
-                <div class="name">{{ s['display_name'] }}</div>
-                <div class="sourceinfo">{{ s['epcount'] }} <a href={{ s['link'] }}>episodes</a>
-                in season(s): {{ ', '.join(s['seasons']) }}</div>
+              <div class="typefree">Free Streaming</div>
+              <div class="name">{{ s['display_name'] }}</div>
+              {% if qtype == 'show' %}
+                  <div class="sourceinfo">
+                    {{ s['epcount'] }} <a href={{ s['link'] }}>episodes</a>
+                    in season(s): {{ ', '.join(s['seasons']) }}
+                  </div>
+              {% else %}
+                  <div class="sourceinfo">Stream <a href={{ s['link'] }}>movie</a> on {{ s['display_name'] }}</div>
+              {% endif %}
             </div>
         {% endfor %}
-    {% endif %}
-    {% if (qtype == 'show') and source_tvp %}  <!-- tv_provider show source boxes -->
-        {% for s in source_tvp %}
+
+        {% for s in source_tvp %}  <!-- tv_provider show source boxes -->
             <div class="source">
-                <div class="typetvp">Stream with TV Provider Login</div>
-                <div class="name">{{ s['display_name'] }}</div>
-                <div class="sourceinfo">{{ s['epcount'] }} <a href={{ s['link'] }}>episodes</a>
-                in season(s): {{ ', '.join(s['seasons']) }}</div>
-                <div class="sourceinfo">Stream with your cable/sat TV account if you have this channel</div>
+              <div class="typetvp">Stream with TV Provider Login</div>
+              <div class="name">{{ s['display_name'] }}</div>
+              {% if qtype == 'show' %}
+                  <div class="sourceinfo">
+                    {{ s['epcount'] }} <a href={{ s['link'] }}>episodes</a>
+                    in season(s): {{ ', '.join(s['seasons']) }}
+                  </div>
+              {% else %}
+                  <div class="sourceinfo">Stream <a href={{ s['link'] }}>movie</a> on {{ s['display_name'] }}</div>
+              {% endif %}
+              <div class="sourceinfo">Stream with your cable/sat TV account if you have this channel</div>
             </div>
         {% endfor %}
-    {% endif %}
-    <div class="u-cf" style="margin-bottom: 15px"></div>
+
+        <div class="u-cf" style="margin-bottom: 15px"></div>
 
  
-    {% elif isresult %}  <!-- display if search result without source -->
-        <p>The {{ qtype }} <strong>{{ media['title'] }} ({{ media['year'] }})</strong>
-            <a href='http://www.imdb.com/title/{{ media['imdb'] }}'>imdb</a>
-            doesn't seem available on these streaming services.</p>
+    {% elif isresult %}  <!-- end-result-ui: search results without a source -->
+        <p>
+          The {{ qtype }} <strong>{{ media['title'] }} ({{ media['year'] }})</strong>
+          <a href='http://www.imdb.com/title/{{ media['imdb'] }}'>imdb</a>
+          doesn't seem available on these streaming services.
+        </p>
 
 
-    {% elif query %}  <!-- display if no search results -->
-          <p>Your search for "{{ query }}" did not match any {{ qtype }} results.
+    {% elif query %}  <!-- end-result-ui: no search results -->
+        <p>Your search for "{{ query }}" did not match any {{ qtype }} results.</p>
     {% endif %}
 
-    
-    {% if other_results %}  <!-- list of other results if available -->
+
+    {% if other_results %}  <!-- end-result-ui: list other search results -->
         <div class="u-cf" style="margin-bottom: 2rem">
-            <br>...or did you mean?:
-            {% for item in other_results %}
-                <a href="{{ item['href'] }}">{{ item['title'] }}</a> &nbsp
-            {% endfor %}
+          <br>...or did you mean?:
+          {% for item in other_results %}
+              <a href="{{ item['link'] }}">{{ item['title'] }}</a> &nbsp;
+          {% endfor %}
         </div>
     {% endif %}
-
-  </div>    
-</body>
-
-</html>
+    
+{% endblock %}
