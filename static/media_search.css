@@ -1,12 +1,12 @@
-IMG.logo {
-    width: 50%;
+.logo {
+    width: 55%;
     height: 49px;
     display: block;
     margin: 4px auto 4px auto;  /* top right bottom left */
  }
 
 /* http://stackoverflow.com/questions/30930792/how-to-make-divs-that-automatically-wrap-to-the-next-row */
-DIV.source {
+.source {
     display: inline-block;
     position: relative;
     width: 252px;
@@ -18,12 +18,12 @@ DIV.source {
     vertical-align: top;
 }
 
-DIV.name {
+.name {
     font-weight: bold;
     font-size: 125%;
 }
 
-DIV.typetvp {
+.typetvp {
     /* background-color: indigo;
     background-color: brown; */ 
     background-color: rebeccapurple;
@@ -31,12 +31,12 @@ DIV.typetvp {
     color: white;
 }
 
-DIV.typefree {
+.typefree {
     /* background-color: darkslategray; */
     background-color: sienna;
     color: white;
 }
 
-DIV.sourceinfo {
+.sourceinfo {
     margin: 3px 0px 6px 0px;  /* top right bottom left */
 }
