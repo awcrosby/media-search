@@ -4,6 +4,9 @@ import json
 import guidebox
 import time
 import urllib
+import requests
+import pymongo
+import pprint
 app = Flask(__name__)
 
 
@@ -25,6 +28,20 @@ def search():
     guidebox.api_key = json.loads(open('apikeys.json').read())['guidebox']
     src = []  # list to hold dictionary of sources
 
+    start = time.time()
+    client = pymongo.MongoClient('localhost', 27017)
+    db = client.MediaData
+
+    # one-time db statements: create/view indexes, del all docs in col
+    ''' # db.Movies.create_index([('id', pymongo.ASCENDING)], unique=True)
+    # db.Shows.create_index([('id', pymongo.ASCENDING)], unique=True)
+    # print sorted(list(db.Shows.index_information()))
+    # print db.Shows.delete_many({})
+    # print db.Movies.delete_many({})'''
+    print db.Movies.count(), db.Shows.count(), 'movies, shows in mongodb'
+    for show in db.Shows.find():
+        print show['title']
+
     # if movie perform movie search
     if qtype == 'movie':
         results = guidebox.Search.movies(precision='fuzzy',
@@ -33,7 +50,14 @@ def search():
             return render_template('index.html', isresult=0,
                                    query=query, qtype=qtype)
         gbid = results['results'][0]['id']  # take first result
-        media = guidebox.Movie.retrieve(id=gbid)  # get more info on movie
+
+        # get movie from mongodb, or api search and add to mongodb
+        media = db.Movies.find_one({'id': gbid})
+        if not media:
+            media = guidebox.Movie.retrieve(id=gbid)
+            m = media.copy()  # keeps media JSON serializable, pymongo alters
+            _id = db.Movies.insert_one(m).inserted_id
+        print 'movie db/api request time: ', time.time() - start
 
         # add sources to src list
         source_types = ['subscription_web_sources',
@@ -55,28 +79,37 @@ def search():
 
     # if show then perform show search across all episodes
     elif qtype == 'show':
-        start = time.time()
         results = guidebox.Search.shows(precision='fuzzy', field='title',
                                         query=query)
         if not (results['total_results'] > 0):  # exit early if no results
             return render_template('index.html', isresult=0,
                                    query=query, qtype=qtype)
-        gbid = results['results'][0]['id']  # take first result
+        show = results['results'][0]  # take first result
+        gbid = show['id']
 
-        # get all episodes in 1 or 2 api requests, to reduce api wait time
-        media = guidebox.Show.episodes(id=gbid, limit=1)
-        total_ep = media['total_results']
-        if total_ep <= 200:
-            media = guidebox.Show.episodes(id=gbid, include_links=True,
-                                           limit=total_ep)
-        else:
-            media = guidebox.Show.episodes(id=gbid, include_links=True,
-                                           limit=200)
-            m2 = guidebox.Show.episodes(id=gbid, include_links=True,
-                                        limit=200, offset=200)
-            media['results'] += m2['results']
-        api_time = time.time()
-        print 'api request time: ', api_time - start
+        # get show from mongodb, or api search and add to mongodb
+        media = db.Shows.find_one({'id': gbid})
+        if not media:
+            # get all episodes in 1 or 2 api requests, to reduce api wait time
+            media = guidebox.Show.episodes(id=gbid, limit=1)
+            total_ep = media['total_results']
+            if total_ep <= 200:
+                media = guidebox.Show.episodes(id=gbid, include_links=True,
+                                               limit=total_ep)
+            else:
+                media = guidebox.Show.episodes(id=gbid, include_links=True,
+                                               limit=200)
+                m2 = guidebox.Show.episodes(id=gbid, include_links=True,
+                                            limit=200, offset=200)
+                media['results'] += m2['results']
+            media['id'] = gbid  # add a key to dictionary to allow lookup
+            media['imdb_id'] = show['imdb_id']
+            media['title'] = show['title']
+            media['first_aired'] = show['first_aired']
+            media['img'] = show['artwork_208x117'] 
+            m = media.copy()  # keeps media JSON serializable, pymongo alters
+            db.Shows.insert_one(m)
+        print 'show db/api request time: ', time.time() - start
 
         # iterate all episodes, add source types: sub, free, tv_provider
         epcount, seasons = ({}, {})
@@ -102,7 +135,6 @@ def search():
                     epcount[s['source']] = epcount.get(s['source'], 0) + 1
                     if ep['season_number'] not in seasons[s['source']]:
                         seasons[s['source']].append(ep['season_number'])
-        print 'episode proc time: ', time.time() - api_time
 
         # for each source, set episode count and seasons
         for s in src:
@@ -156,19 +188,19 @@ def search():
     # build other_results to send to template
     other_results = []
     for m in results['results'][1:]:
-        params = {'q': m['title'], 'type': qtype}
-        x = {'link': 'search?' + urllib.urlencode(params),
+        q_percent_enc = urllib.quote(m['title'].encode('utf-8'))
+        x = {'link': 'search?q=' + q_percent_enc + '&type=' + qtype,
              'title': m['title']}
         if (m['wikipedia_id'] != 0) and (m['wikipedia_id'] is not None):
             other_results.append(x)  # keep if not very obscure
 
-    # temp debugging
-    f = open('results.txt', 'w')
-    f.write('query = ' + query + '\n dict = ' + repr(results) + '\n')
-    f.close()
-    f = open('media.txt', 'w')
-    f.write('dict = ' + repr(media) + '\n')
-    f.close()
+    # logs dictionaries retrieved, either from db or api
+    logResults = open('results.txt', 'w')
+    pprint.pprint(results, logResults)
+    logResults.close()
+    logMedia = open('media.txt', 'w')
+    pprint.pprint(media, logMedia)
+    logMedia.close()
 
     return render_template('index.html', media=med,
                            query=query, qtype=qtype,
