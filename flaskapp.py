@@ -17,7 +17,7 @@ def home():
 
 @app.route('/search', methods=['GET'])
 def search():
-    query = request.args.get('q')  # or if POST: query = request.form['q']
+    query = request.args.get('q')  # request.args.get returns unicode
 
     # type param comes from either button display name or 'did you mean' links
     qtype = 'show' if 'show' in request.args.get('type').lower() else 'movie'
@@ -59,7 +59,7 @@ def search():
             _id = db.Movies.insert_one(m).inserted_id
         print 'movie db/api request time: ', time.time() - start
 
-        # add sources to src list
+        # add sources to src list, text from api is unicode
         source_types = ['subscription_web_sources',
                         'free_web_sources',
                         'tv_everywhere_web_sources']
@@ -191,8 +191,8 @@ def search():
         q_percent_enc = urllib.quote(m['title'].encode('utf-8'))
         x = {'link': 'search?q=' + q_percent_enc + '&type=' + qtype,
              'title': m['title']}
-        if (m['wikipedia_id'] != 0) and (m['wikipedia_id'] is not None):
-            other_results.append(x)  # keep if not very obscure
+        #if (m['wikipedia_id'] != 0) and (m['wikipedia_id'] is not None):
+        other_results.append(x)  # keep if not very obscure
 
     # logs dictionaries retrieved, either from db or api
     logResults = open('results.txt', 'w')
