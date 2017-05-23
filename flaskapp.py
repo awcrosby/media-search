@@ -7,6 +7,7 @@ import urllib
 import requests
 import pymongo
 import pprint
+from show_episodes import get_all_ep
 app = Flask(__name__)
 
 
@@ -31,16 +32,6 @@ def search():
     start = time.time()
     client = pymongo.MongoClient('localhost', 27017)
     db = client.MediaData
-
-    # one-time db statements: create/view indexes, del all docs in col
-    ''' # db.Movies.create_index([('id', pymongo.ASCENDING)], unique=True)
-    # db.Shows.create_index([('id', pymongo.ASCENDING)], unique=True)
-    # print sorted(list(db.Shows.index_information()))
-    # print db.Shows.delete_many({})
-    # print db.Movies.delete_many({})'''
-    print db.Movies.count(), db.Shows.count(), 'movies, shows in mongodb'
-    for show in db.Shows.find():
-        print show['title']
 
     # if movie perform movie search
     if qtype == 'movie':
@@ -90,23 +81,7 @@ def search():
         # get show from mongodb, or api search and add to mongodb
         media = db.Shows.find_one({'id': gbid})
         if not media:
-            # get all episodes in 1 or 2 api requests, to reduce api wait time
-            media = guidebox.Show.episodes(id=gbid, limit=1)
-            total_ep = media['total_results']
-            if total_ep <= 200:
-                media = guidebox.Show.episodes(id=gbid, include_links=True,
-                                               limit=total_ep)
-            else:
-                media = guidebox.Show.episodes(id=gbid, include_links=True,
-                                               limit=200)
-                m2 = guidebox.Show.episodes(id=gbid, include_links=True,
-                                            limit=200, offset=200)
-                media['results'] += m2['results']
-            media['id'] = gbid  # add a key to dictionary to allow lookup
-            media['imdb_id'] = show['imdb_id']
-            media['title'] = show['title']
-            media['first_aired'] = show['first_aired']
-            media['img'] = show['artwork_208x117'] 
+            media = get_all_ep(gbid)
             m = media.copy()  # keeps media JSON serializable, pymongo alters
             db.Shows.insert_one(m)
         print 'show db/api request time: ', time.time() - start
