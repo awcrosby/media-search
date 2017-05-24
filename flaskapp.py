@@ -1,10 +1,9 @@
 #!/usr/bin/env python
-from flask import Flask, render_template, request, url_for
+from flask import Flask, render_template, request
 import json
 import guidebox
 import time
 import urllib
-import requests
 import pymongo
 import pprint
 from show_episodes import get_all_ep
@@ -47,7 +46,7 @@ def search():
         if not media:
             media = guidebox.Movie.retrieve(id=gbid)
             m = media.copy()  # keeps media JSON serializable, pymongo alters
-            _id = db.Movies.insert_one(m).inserted_id
+            db.Movies.insert_one(m).inserted_id  # this returns unique db id
         print 'movie db/api request time: ', time.time() - start
 
         # add sources to src list, text from api is unicode
@@ -166,14 +165,14 @@ def search():
         q_percent_enc = urllib.quote(m['title'].encode('utf-8'))
         x = {'link': 'search?q=' + q_percent_enc + '&type=' + qtype,
              'title': m['title']}
-        #if (m['wikipedia_id'] != 0) and (m['wikipedia_id'] is not None):
-        other_results.append(x)  # keep if not very obscure
+        # if (m['wikipedia_id'] != 0) and (m['wikipedia_id'] is not None):
+        other_results.append(x)  # only keep if not very obscure
 
     # logs dictionaries retrieved, either from db or api
-    logResults = open('results.txt', 'w')
+    logResults = open('logs/results.txt', 'w')
     pprint.pprint(results, logResults)
     logResults.close()
-    logMedia = open('media.txt', 'w')
+    logMedia = open('logs/media.txt', 'w')
     pprint.pprint(media, logMedia)
     logMedia.close()
 

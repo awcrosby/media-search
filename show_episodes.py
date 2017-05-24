@@ -2,16 +2,19 @@
 import json
 import guidebox
 
-def get_all_ep( gbid ):
+
+def get_all_ep(gbid):
     guidebox.api_key = json.loads(open('apikeys.json').read())['guidebox']
 
     # get high-level show info
     show = guidebox.Show.retrieve(id=gbid)
 
-    # get dict with many episodes, add nextpages if multi pages
+    # get dictionary with many episodes
     page_len = 100
     episodes = guidebox.Show.episodes(id=gbid, include_links=True,
                                       limit=page_len)
+
+    # get more pages of ep, only if results are greater than page_len
     for i in range(1, episodes['total_results']/page_len + 1):
         nextpage = guidebox.Show.episodes(id=gbid, include_links=True,
                                           limit=page_len,
