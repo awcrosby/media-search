@@ -15,7 +15,8 @@ def main():
     # connect to mongodb, prepare api key, set logging config
     client = pymongo.MongoClient('localhost', 27017)
     db = client.MediaData
-    guidebox.api_key = json.loads(open('apikeys.json').read())['guidebox']
+    guidebox.api_key = json.loads(open('/home/awcrosby/media-search/'
+                                  'apikeys.json').read())['guidebox']
     halfday_ago = int(time.time() - 46800)  # 13 hours ago to ensure overlap
     logging.basicConfig(filename='/home/awcrosby/media-search/'
                         'logs/log_db_update.txt',
@@ -32,9 +33,9 @@ def main():
 
     # get list of movies to maintain, from guidebox popular and mongodb
     gb_mov = guidebox.Movie.list(limit=100)
-    gb_ids = [m['id'] for m in gb_mov['results']]
+    pop_ids = [m['id'] for m in gb_mov['results']]
     mon_ids = [m['id'] for m in db.Movies.find()]
-    new_ids = list(set(gb_ids) - set(mon_ids))
+    new_ids = list(set(pop_ids) - set(mon_ids))
 
     # for all new movies get guidebox info and write to mongodb
     for gbid in new_ids:
@@ -58,12 +59,12 @@ def main():
     ''' Section for shows '''
     # get list of shows to maintain, from guidebox popular and mongodb
     gb_show = guidebox.Show.list(limit=100)
-    gb_id = [m['id'] for m in gb_show['results']]
-    mon_id = [m['id'] for m in db.Shows.find()]
-    new_id = list(set(gb_id) - set(mon_id))
+    pop_ids = [m['id'] for m in gb_show['results']]
+    mon_ids = [m['id'] for m in db.Shows.find()]
+    new_ids = list(set(pop_ids) - set(mon_ids))
 
     # for all new shows get guidebox episodes and write to mongodb
-    for gbid in new_id:
+    for gbid in new_ids:
         show_ep = get_all_ep(gbid)
         db.Shows.insert_one(show_ep)
         logging.info('show added: ' + show_ep['title'])
