@@ -4,7 +4,7 @@ import guidebox
 import pymongo
 import time
 import logging
-from show_episodes import get_all_ep
+from shared_func import get_all_ep
 
 '''update mongo database with most popular shows and movies
    then update any media inside database that has experienced an update

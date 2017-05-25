@@ -6,9 +6,14 @@ import time
 import urllib
 import pymongo
 import pprint
-from show_episodes import get_all_ep
+import logging
+from shared_func import get_all_ep
 app = Flask(__name__)
 
+logging.basicConfig(filename='/home/awcrosby/media-search/'
+                    'logs/log_flaskapp.txt',
+                    format='%(asctime)s %(levelname)s: %(message)s',
+                    level=logging.INFO)
 
 @app.route('/')
 def home():
@@ -47,6 +52,8 @@ def search():
             media = guidebox.Movie.retrieve(id=gbid)
             m = media.copy()  # keeps media JSON serializable, pymongo alters
             db.Movies.insert_one(m).inserted_id  # this returns unique db id
+            logging.info('movie added: ' + media['title'])
+        logging.info('movie db/api request time: ' + str(time.time() - start))
         print 'movie db/api request time: ', time.time() - start
 
         # add sources to src list, text from api is unicode
@@ -83,6 +90,8 @@ def search():
             media = get_all_ep(gbid)
             m = media.copy()  # keeps media JSON serializable, pymongo alters
             db.Shows.insert_one(m)
+            logging.info('show added: ' + media['title'])
+        logging.info('show db/api request time: ' + str(time.time() - start))
         print 'show db/api request time: ', time.time() - start
 
         # iterate all episodes, add source types: sub, free, tv_provider
