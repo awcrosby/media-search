@@ -10,10 +10,6 @@ import logging
 from shared_func import get_all_ep
 app = Flask(__name__)
 
-logging.basicConfig(filename='/home/awcrosby/media-search/'
-                    'logs/log_flaskapp.txt',
-                    format='%(asctime)s %(levelname)s: %(message)s',
-                    level=logging.INFO)
 
 @app.route('/')
 def home():
@@ -22,6 +18,11 @@ def home():
 
 @app.route('/search', methods=['GET'])
 def search():
+    logging.basicConfig(filename='/home/awcrosby/media-search/'
+                        'logs/log_flaskapp.txt',
+                        format='%(asctime)s %(levelname)s: %(message)s',
+                        level=logging.INFO)
+
     query = request.args.get('q')  # request.args.get returns unicode
 
     # type param comes from either button display name or 'did you mean' links
@@ -32,6 +33,8 @@ def search():
 
     guidebox.api_key = json.loads(open('apikeys.json').read())['guidebox']
     src = []  # list to hold dictionary of sources
+    logging.info('user query: ' + query)
+    print 'user query: ', query
 
     start = time.time()
     client = pymongo.MongoClient('localhost', 27017)

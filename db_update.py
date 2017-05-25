@@ -31,9 +31,18 @@ def main():
     # print db.Movies.delete_many({})  # delete all movies in database
     # import q; q.d()
 
-    # get list of movies to maintain, from guidebox popular and mongodb
-    gb_mov = guidebox.Movie.list(limit=100)
-    pop_ids = [m['id'] for m in gb_mov['results']]
+    # get initial dictionary with many guidebox popular movies
+    mov_limit = 200
+    page_len = 50
+    gb_movs = guidebox.Movie.list(limit=page_len)
+
+    # get the additional pages of popular movies
+    for i in range(1, mov_limit/page_len):
+        nextpage = guidebox.Movie.list(limit=page_len, offset=page_len*i)
+        gb_movs['results'] += nextpage['results']
+
+    # get list of new movie ids, based on popular and existing mongodb
+    pop_ids = [m['id'] for m in gb_movs['results']]
     mon_ids = [m['id'] for m in db.Movies.find()]
     new_ids = list(set(pop_ids) - set(mon_ids))
 
@@ -57,9 +66,18 @@ def main():
         logging.info('movie updated: ' + mov_detail['title'])
 
     ''' Section for shows '''
-    # get list of shows to maintain, from guidebox popular and mongodb
-    gb_show = guidebox.Show.list(limit=100)
-    pop_ids = [m['id'] for m in gb_show['results']]
+    # get initial dictionary with many guidebox popular shows
+    show_limit = 200
+    page_len = 50
+    gb_shows = guidebox.Show.list(limit=page_len)
+
+    # get the additional pages of popular shows
+    for i in range(1, show_limit/page_len):
+        nextpage = guidebox.Show.list(limit=page_len, offset=page_len*i)
+        gb_shows['results'] += nextpage['results']
+
+    # get list of new show ids, based on popular and existing mongodb
+    pop_ids = [m['id'] for m in gb_shows['results']]
     mon_ids = [m['id'] for m in db.Shows.find()]
     new_ids = list(set(pop_ids) - set(mon_ids))
 
