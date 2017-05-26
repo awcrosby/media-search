@@ -6,9 +6,9 @@ import time
 import logging
 from shared_func import get_all_ep
 
-'''update mongo database with most popular shows and movies
-   then update any media inside database that has experienced an update
-   note: if tried to store all, in 1 week: changed movies 9k, changed ep 2k'''
+'''db_update.py script populates and updates database daily
+    add to mongo database any new top-popular shows and movies
+    update any media inside database that has experienced an update'''
 
 
 def main():

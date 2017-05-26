@@ -12,9 +12,14 @@ q==2.6
 requests==2.13.0
 six==1.10.0
 Werkzeug==0.12.1
-# Application_Pieces
+# ==System Pieces==
 # Hosting: Digital Ocean, ubuntu
+# Networking: ufw firewall port access, and iptables port redirect
+# Application: site to resolve media query and display data from db or api
 # Webserver: flask
-# Application: python
-# UI: Jinja templates via flask, boilerplate CSS skeleton
+# Dev Environment: python2.7, git, vim, tmux, virtualenv, mobaxterm ssh
 # APIs: Guidebox
+# Database: mongodb
+# Script: daily crontab run python script to write api updates to db
+# UI: Jinja templates via flask, boilerplate CSS via skeleton
+# Logging: python built-in logging for flaskapp and db_update

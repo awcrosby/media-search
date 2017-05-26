@@ -10,6 +10,12 @@ import logging
 from shared_func import get_all_ep
 app = Flask(__name__)
 
+'''webserver flaskapp high-level functionality:
+    resolve user search query to a specific media
+    search for media details in database otherwise request from guidebox api
+    display streaming sources by type, with links and show ep info
+    list 'did you mean' links if more than one query result was found'''
+
 logging.basicConfig(filename='/home/awcrosby/media-search/'
                     'logs/log_flaskapp.txt',
                     format='%(asctime)s %(levelname)s: %(message)s',

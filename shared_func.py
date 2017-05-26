@@ -2,6 +2,8 @@
 import json
 import guidebox
 
+'''shared functionality between web flaskapp and backend db_update script'''
+
 
 def get_all_ep(gbid):
     guidebox.api_key = json.loads(open('/home/awcrosby/media-search/'
