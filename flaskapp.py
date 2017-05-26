@@ -10,6 +10,11 @@ import logging
 from shared_func import get_all_ep
 app = Flask(__name__)
 
+logging.basicConfig(filename='/home/awcrosby/media-search/'
+                    'logs/log_flaskapp.txt',
+                    format='%(asctime)s %(levelname)s: %(message)s',
+                    level=logging.INFO)
+
 
 @app.route('/')
 def home():
@@ -18,11 +23,6 @@ def home():
 
 @app.route('/search', methods=['GET'])
 def search():
-    logging.basicConfig(filename='/home/awcrosby/media-search/'
-                        'logs/log_flaskapp.txt',
-                        format='%(asctime)s %(levelname)s: %(message)s',
-                        level=logging.INFO)
-
     query = request.args.get('q')  # request.args.get returns unicode
 
     # type param comes from either button display name or 'did you mean' links

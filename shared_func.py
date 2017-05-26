@@ -4,8 +4,8 @@ import guidebox
 
 
 def get_all_ep(gbid):
-    guidebox.api_key = json.loads(open('apikeys.json').read())['guidebox']
-
+    guidebox.api_key = json.loads(open('/home/awcrosby/media-search/'
+                                  'apikeys.json').read())['guidebox']
     # get high-level show info
     show = guidebox.Show.retrieve(id=gbid)
 
