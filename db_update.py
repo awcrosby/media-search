@@ -19,7 +19,7 @@ def main():
                                   'apikeys.json').read())['guidebox']
     halfday_ago = int(time.time() - 44100)  # 12hr 15min ago to ensure overlap
     logging.basicConfig(filename='/home/awcrosby/media-search/'
-                        'logs/log_db_update.txt',
+                        'log/db_update.log',
                         format='%(asctime)s %(levelname)s: %(message)s',
                         level=logging.INFO)
 

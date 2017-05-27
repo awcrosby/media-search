@@ -17,7 +17,7 @@ app = Flask(__name__)
     list 'did you mean' links if more than one query result was found'''
 
 logging.basicConfig(filename='/home/awcrosby/media-search/'
-                    'logs/log_flaskapp.txt',
+                    'log/flaskapp.log',
                     format='%(asctime)s %(levelname)s: %(message)s',
                     level=logging.INFO)
 
@@ -187,10 +187,10 @@ def search():
         other_results.append(x)  # only keep if not very obscure
 
     # logs dictionaries retrieved, either from db or api
-    logResults = open('logs/results.txt', 'w')
+    logResults = open('log/search_results.log', 'w')
     pprint.pprint(results, logResults)
     logResults.close()
-    logMedia = open('logs/media.txt', 'w')
+    logMedia = open('log/media_detail.log', 'w')
     pprint.pprint(media, logMedia)
     logMedia.close()
 
