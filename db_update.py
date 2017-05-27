@@ -17,7 +17,7 @@ def main():
     db = client.MediaData
     guidebox.api_key = json.loads(open('/home/awcrosby/media-search/'
                                   'apikeys.json').read())['guidebox']
-    halfday_ago = int(time.time() - 46800)  # 13 hours ago to ensure overlap
+    halfday_ago = int(time.time() - 44100)  # 12hr 15min ago to ensure overlap
     logging.basicConfig(filename='/home/awcrosby/media-search/'
                         'logs/log_db_update.txt',
                         format='%(asctime)s %(levelname)s: %(message)s',
@@ -32,7 +32,7 @@ def main():
     # import q; q.d()
 
     # get initial dictionary with many guidebox popular movies
-    mov_limit = 200
+    mov_limit = 300
     page_len = 50
     gb_movs = guidebox.Movie.list(limit=page_len)
 
@@ -67,7 +67,7 @@ def main():
 
     ''' Section for shows '''
     # get initial dictionary with many guidebox popular shows
-    show_limit = 200
+    show_limit = 300
     page_len = 50
     gb_shows = guidebox.Show.list(limit=page_len)
 
