@@ -7,24 +7,23 @@
 
     <div class="row">  <!-- search box and buttons-->
       <form action="/search" method="get">
-        <div class="five columns" style="margin-right: 3px">
+        <div class="six columns" style="margin-right: 3px">
           <input type="text" class="u-full-width" placeholder="Terminator ... Mockingjay 2 ... Broad City ...  InuYasha" name="q" value="{{ query }}" autofocus>
         </div>
-        <div class="seven columns" style="margin-left: 3px">
+        <div class="six columns" style="margin-left: 3px">
           <select name="mtype">
             <option value="movie">Search Movies</option>
             <option value="show" {% if qtype == 'show' %} selected {% endif %}>Search Shows</option>
           </select> 
           <input type="submit" class="button-primary" value="Search">
-          <!-- <input type="submit" class="button-primary" name="type" value="Search Movies">
-          <input type="submit" name="type" value="Search Shows"> -->
         </div>
       </form>
     </div>
 
     <!-- end-result-ui: a source was found -->
-    {% if (source_sub or source_free or source_tvp) %}
-        <div style="margin-top: 15px">  <!-- box with media image and description -->
+    {% if media and media['src_display'] %}
+        <!-- box with media image and description -->
+        <div style="margin-top: 15px">  
           <img class="u-pull-left" style="margin-right: 2%" src="{{ media['img'] }}" alt="Media result image" />
           <div>
             The {{ qtype }} <strong>{{ media['title'] }} ({{ media['year'] }})</strong>
@@ -35,7 +34,8 @@
         <div class="u-cf" style="margin-bottom: 15px"></div>
         <br>
 
-        {% for s in source_sub %}  <!-- subscription source boxes -->
+        {% for s in media['src_display'] %}
+            <!-- display logo or title in source boxes -->
             <div class="source">
               {% if s['source'] == 'netflix' %}
                   <img class="logo" src="{{ url_for('static', filename='netflix_logo.png') }}" alt="Netflix logo" />
@@ -47,10 +47,19 @@
                   <img class="logo" src="{{ url_for('static', filename='hbo_logo.png') }}" alt="HBO logo" />
               {% elif s['source'] == 'showtime_subscription' %}
                   <img class="logo" src="{{ url_for('static', filename='showtime_logo.png') }}" alt="Showtime logo" />
-              {% else %} <!-- this is an unknown subscription source -->
+              {% elif s['type'] == 'subscription_web_sources' %}
                   <div class="typefree">Stream with Subscription</div>
                   <div class="name">{{ s['display_name'] }}</div>
+              {% elif s['type'] == 'tv_everywhere_web_sources' %}
+                  <div class="typetvp">Stream with TV Provider Login</div>
+                  <div class="name">{{ s['display_name'] }}</div>
+                  <div class="sourceinfo">Stream with your cable/sat TV account if you have this channel</div>
+              {% elif s['type'] == 'free_web_sources' %}
+                  <div class="typefree">Stream Free</div>
+                  <div class="name">{{ s['display_name'] }}</div>
               {% endif %}
+
+              <!-- display source info -->
               {% if qtype == 'show' %}
                   <div class="sourceinfo">
                     {{ s['epcount'] }} <a href={{ s['link'] }}>episodes</a>
@@ -74,41 +83,10 @@
             </div>
         {% endfor %}
 
-        {% for s in source_free %}  <!-- free show source boxes -->
-            <div class="source">
-              <div class="typefree">Free Streaming</div>
-              <div class="name">{{ s['display_name'] }}</div>
-              {% if qtype == 'show' %}
-                  <div class="sourceinfo">
-                    {{ s['epcount'] }} <a href={{ s['link'] }}>episodes</a>
-                    in season(s): {{ ', '.join(s['seasons']) }}
-                  </div>
-              {% else %}
-                  <div class="sourceinfo">Stream <a href={{ s['link'] }}>movie</a> on {{ s['display_name'] }}</div>
-              {% endif %}
-            </div>
-        {% endfor %}
-
-        {% for s in source_tvp %}  <!-- tv_provider show source boxes -->
-            <div class="source">
-              <div class="typetvp">Stream with TV Provider Login</div>
-              <div class="name">{{ s['display_name'] }}</div>
-              {% if qtype == 'show' %}
-                  <div class="sourceinfo">
-                    {{ s['epcount'] }} <a href={{ s['link'] }}>episodes</a>
-                    in season(s): {{ ', '.join(s['seasons']) }}
-                  </div>
-              {% else %}
-                  <div class="sourceinfo">Stream <a href={{ s['link'] }}>movie</a> on {{ s['display_name'] }}</div>
-              {% endif %}
-              <div class="sourceinfo">Stream with your cable/sat TV account if you have this channel</div>
-            </div>
-        {% endfor %}
-
         <div class="u-cf" style="margin-bottom: 15px"></div>
 
  
-    {% elif isresult %}  <!-- end-result-ui: search results without a source -->
+    {% elif media %}  <!-- end-result-ui: search results without a source -->
         <p>
           The {{ qtype }} <strong>{{ media['title'] }} ({{ media['year'] }})</strong>
           <a href='http://www.imdb.com/title/{{ media['imdb'] }}'>imdb</a>

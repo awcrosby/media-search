@@ -13,6 +13,8 @@ def add_src_display(media, mtype):
 
     # build src_display for movie
     if mtype == 'movie':
+        media['year'] = media['release_year']
+        media['img'] = media['poster_120x171']
         for source_type in source_types:
             for s in media[source_type]:
                 y = {'source': s['source'],
@@ -79,6 +81,12 @@ def add_src_display(media, mtype):
     src_display = [s for s in src_display
                    if not s['source'] in redundant_or_broken_src]
 
+    # sort src_display
+    s1 = [s for s in src_display if s['type'] == 'subscription_web_sources']
+    s2 = [s for s in src_display if s['type'] == 'tv_everywhere_web_sources']
+    s3 = [s for s in src_display if s['type'] == 'free_web_sources']
+    src_display = s1 + s2 + s3
+
     # append to media src_display and mtype
     media['src_display'] = src_display
     media['mtype'] = mtype
@@ -108,7 +116,7 @@ def get_all_ep(gbid):
     episodes['id'] = gbid  # add a key to dictionary to allow lookup
     episodes['imdb_id'] = show['imdb_id']
     episodes['title'] = show['title']
-    episodes['first_aired'] = show['first_aired']
+    episodes['year'] = show['first_aired'][:4]
     episodes['img'] = show['artwork_208x117']
 
     return episodes
