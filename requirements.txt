@@ -16,7 +16,7 @@ Werkzeug==0.12.1
 # Hosting: Digital Ocean, ubuntu
 # Networking: ufw firewall port access, and iptables port redirect
 # Application: site to resolve media query and display data from db or api
-# Webserver: flask
+# Webframework: flask
 # Dev Environment: python2.7, git, vim, tmux, virtualenv, mobaxterm ssh
 # APIs: Guidebox
 # Database: mongodb

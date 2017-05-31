@@ -7,10 +7,10 @@ import urllib
 import pymongo
 import pprint
 import logging
-from shared_func import get_all_ep
+from shared_func import get_all_ep, add_src_display
 app = Flask(__name__)
 
-'''webserver flaskapp high-level functionality:
+'''webframework flaskapp high-level functionality:
     resolve user search query to a specific media
     search for media details in database otherwise request from guidebox api
     display streaming sources by type, with links and show ep info
@@ -27,12 +27,31 @@ def home():
     return render_template('index.html')
 
 
+@app.route('/list')
+def showlist():
+    client = pymongo.MongoClient('localhost', 27017)
+    db = client.MediaData
+    movies = list(db.Movies.find().limit(7))  # results in mem, not db cursor
+    shows = list(db.Shows.find().limit(7))  # results in mem, not db cursor
+ 
+    for m in movies:
+        m = add_src_display(m, 'movie')
+
+    for m in shows:
+        m = add_src_display(m, 'show')
+
+    medias = movies + shows   
+    
+    return render_template('list.html', medias=medias)
+
+
 @app.route('/search', methods=['GET'])
 def search():
     query = request.args.get('q')  # request.args.get returns unicode
 
     # type param comes from either button display name or 'did you mean' links
-    qtype = 'show' if 'show' in request.args.get('type').lower() else 'movie'
+    # qtype = 'show' if 'show' in request.args.get('type').lower() else 'movie'
+    qtype = request.args.get('mtype')
 
     if not query:  # exit early if query is blank
         return render_template('index.html')

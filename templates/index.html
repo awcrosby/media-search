@@ -11,8 +11,13 @@
           <input type="text" class="u-full-width" placeholder="Terminator ... Mockingjay 2 ... Broad City ...  InuYasha" name="q" value="{{ query }}" autofocus>
         </div>
         <div class="seven columns" style="margin-left: 3px">
-          <input type="submit" class="button-primary" name="type" value="Search Movies">
-          <input type="submit" name="type" value="Search Shows">
+          <select name="mtype">
+            <option value="movie">Search Movies</option>
+            <option value="show" {% if qtype == 'show' %} selected {% endif %}>Search Shows</option>
+          </select> 
+          <input type="submit" class="button-primary" value="Search">
+          <!-- <input type="submit" class="button-primary" name="type" value="Search Movies">
+          <input type="submit" name="type" value="Search Shows"> -->
         </div>
       </form>
     </div>

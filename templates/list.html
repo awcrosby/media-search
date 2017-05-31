@@ -1,0 +1,25 @@
+{% extends 'layout.html' %}
+
+{% block body %}
+    <div style="margin-top: 6%">  <!-- introduction -->
+      <h4>List of Media</h4>
+    </div>
+
+    {% for m in medias %}
+        <div>
+          {% if m['mtype'] == 'show' %}
+              {{ '\U0001F4FA' }}
+          {% else %}
+              {{ '\U0001F3A5' }}
+          {% endif %}
+          {{ m['title'] }}
+          {% for s in m['src_display'] %}
+              | {{ s['display_name'] }}
+              <a href={{ s['link'] }}>watch</a>
+              <a href=placeholder.html>signup</a>
+          {% endfor %}
+        </div>
+        <div class="u-cf" />
+    {% endfor %}
+    
+{% endblock %}
