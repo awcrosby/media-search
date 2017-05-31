@@ -31,14 +31,14 @@ def home():
 def showlist():
     client = pymongo.MongoClient('localhost', 27017)
     db = client.MediaData
-    movies = list(db.Movies.find().limit(7))  # results in mem, not db cursor
-    shows = list(db.Shows.find().limit(7))  # results in mem, not db cursor
+    movies = list(db.Movies.find().limit(15))  # results in mem, not db cursor
+    shows = list(db.Shows.find().limit(15))  # results in mem, not db cursor
  
     for m in movies:
         m = add_src_display(m, 'movie')
     for m in shows:
         m = add_src_display(m, 'show')
-    medias = movies + shows   
+    medias = shows + movies
     
     return render_template('list.html', medias=medias)
 
@@ -47,7 +47,15 @@ def showlist():
 def search():
     # get form data (unicode), and exit early if query is blank
     query = request.args.get('q')
-    qtype = request.args.get('mtype')
+    qtype = 'movie' if request.args.get('mtype') != 'show' else 'show'
+    link_id = request.args.get('id')  # passed via 'did you mean?' link
+    try:
+        if link_id:
+            link_id = int(link_id)
+    except:
+        logging.error('link_id GET var could not convert to int')
+        link_id = None
+    gbid = link_id
     if not query:
         return render_template('index.html')
 
@@ -60,12 +68,13 @@ def search():
     db = client.MediaData
 
     if qtype == 'movie':
-        # get movie query results, and take top result
-        results = guidebox.Search.movies(field='title', query=query)
-        if not (results['total_results'] > 0):  # exit early if no results
-            return render_template('index.html', isresult=0,
-                                   query=query, qtype=qtype)
-        gbid = results['results'][0]['id']  # take first result
+        # get movie query results, take top result, unless id passed in
+        if not link_id:
+            results = guidebox.Search.movies(field='title', query=query)
+            if not (results['total_results'] > 0):  # exit early if no results
+                return render_template('index.html', isresult=0,
+                                       query=query, qtype=qtype)
+            gbid = results['results'][0]['id']  # take first result
 
         # get movie details from mongodb, or api search and add to mongodb
         media = db.Movies.find_one({'id': gbid})
@@ -80,12 +89,13 @@ def search():
         media = add_src_display(media, 'movie')
 
     elif qtype == 'show':
-        # get show query results, and take top result
-        results = guidebox.Search.shows(field='title', query=query)
-        if not (results['total_results'] > 0):  # exit early if no results
-            return render_template('index.html', isresult=0,
-                                   query=query, qtype=qtype)
-        gbid = results['results'][0]['id']  # take first result
+        # get show query results, and take top result, unless id passed in
+        if not link_id:
+            results = guidebox.Search.shows(field='title', query=query)
+            if not (results['total_results'] > 0):  # exit early if no results
+                return render_template('index.html', isresult=0,
+                                       query=query, qtype=qtype)
+            gbid = results['results'][0]['id']  # take first result
 
         # get show details from mongodb, or api search and add to mongodb
         media = db.Shows.find_one({'id': gbid})
@@ -100,27 +110,30 @@ def search():
         media = add_src_display(media, 'show')
 
         # append result high-level info to show_ep dict, not in all db docs
-        m = results['results'][0]
-        media['year'] =  m['first_aired'][:4]
-        media['imdb'] = m['imdb_id']
-        media['img'] =  m['artwork_208x117']
+        if not link_id:  # if link id passed in, won't do search/results
+            m = results['results'][0]
+            media['year'] =  m['first_aired'][:4]
+            media['imdb'] = m['imdb_id']
+            media['img'] =  m['artwork_208x117']
 
-    # build other_results to send to template
+    # build other_results to send to template, if no link id passed
     other_results = []
-    for m in results['results'][1:5]:
-        q_percent_enc = urllib.quote(m['title'].encode('utf-8'))
-        x = {'link': 'search?q=' + q_percent_enc + '&type=' + qtype,
-             'title': m['title']}
-        # if (m['wikipedia_id'] != 0) and (m['wikipedia_id'] is not None):
-        other_results.append(x)  # only keep if not very obscure
+    if not link_id:
+        for m in results['results'][1:5]:
+            t = urllib.quote(m['title'].encode('utf-8'))  # percent encoded
+            link = 'search?q=' + t + '&mtype=' + qtype + '&id=' + str(m['id'])
+            x = {'link': link, 'title': m['title']}
+            # if (m['wikipedia_id'] != 0) and (m['wikipedia_id'] is not None):
+            other_results.append(x)  # only keep if not very obscure
 
     # logs dictionaries retrieved, either from db or api
-    logResults = open('log/search_results.log', 'w')
-    pprint.pprint(results, logResults)
-    logResults.close()
-    logMedia = open('log/media_detail.log', 'w')
-    pprint.pprint(media, logMedia)
-    logMedia.close()
+    if not link_id:
+        logResults = open('log/search_results.log', 'w')
+        pprint.pprint(results, logResults)
+        logResults.close()
+        logMedia = open('log/media_detail.log', 'w')
+        pprint.pprint(media, logMedia)
+        logMedia.close()
 
     return render_template('index.html', media=media, query=query,
                            qtype=qtype, other_results=other_results)
