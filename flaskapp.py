@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, url_for
 import json
 import guidebox
 import time
@@ -42,38 +42,34 @@ def showlist():
     
     return render_template('list.html', medias=medias)
 
-
+@app.route('/<mtype>/id/<int:gbid>')
 @app.route('/search', methods=['GET'])
-def search():
-    # get form data (unicode), and exit early if query is blank
-    query = request.args.get('q')
-    qtype = 'movie' if request.args.get('mtype') != 'show' else 'show'
-    link_id = request.args.get('id')  # passed via 'did you mean?' link
-    try:
-        if link_id:
-            link_id = int(link_id)
-    except:
-        logging.error('link_id GET var could not convert to int')
-        link_id = None
-    gbid = link_id
-    if not query:
+def search(mtype='movie', gbid=None, query=''):
+    # get query, then resolve mtype from url path or GET args
+    query = request.args.get('q')  # can be string or NoneType
+    if query:
+        mtype = 'movie' if request.args.get('mtype') != 'show' else 'show'
+        query = query.strip()
+    elif gbid:
+        mtype = 'movie' if mtype != 'show' else 'show'
+        query = ''
+        
+    if not (query or gbid):
         return render_template('index.html')
 
     # prepare for search and connect to database
     guidebox.api_key = json.loads(open('apikeys.json').read())['guidebox']
-    logging.info('user query: ' + query)
-    print 'user query: ', query
     start = time.time()
     client = pymongo.MongoClient('localhost', 27017)
     db = client.MediaData
 
-    if qtype == 'movie':
+    if mtype == 'movie':
         # get movie query results, take top result, unless id passed in
-        if not link_id:
+        if query:
             results = guidebox.Search.movies(field='title', query=query)
             if not (results['total_results'] > 0):  # exit early if no results
                 return render_template('index.html', isresult=0,
-                                       query=query, qtype=qtype)
+                                       query=query, mtype=mtype)
             gbid = results['results'][0]['id']  # take first result
 
         # get movie details from mongodb, or api search and add to mongodb
@@ -88,13 +84,13 @@ def search():
         # add display sources to the movie detail dict
         media = add_src_display(media, 'movie')
 
-    elif qtype == 'show':
+    elif mtype == 'show':
         # get show query results, and take top result, unless id passed in
-        if not link_id:
+        if query:
             results = guidebox.Search.shows(field='title', query=query)
             if not (results['total_results'] > 0):  # exit early if no results
                 return render_template('index.html', isresult=0,
-                                       query=query, qtype=qtype)
+                                       query=query, mtype=mtype)
             gbid = results['results'][0]['id']  # take first result
 
         # get show details from mongodb, or api search and add to mongodb
@@ -110,24 +106,25 @@ def search():
         media = add_src_display(media, 'show')
 
         # append result high-level info to show_ep dict, not in all db docs
-        if not link_id:  # if link id passed in, won't do search/results
+        if query:
             m = results['results'][0]
             media['year'] =  m['first_aired'][:4]
             media['imdb'] = m['imdb_id']
             media['img'] =  m['artwork_208x117']
 
-    # build other_results to send to template, if no link id passed
+    # build other_results to send to template, if query was performed
     other_results = []
-    if not link_id:
+    if query:
         for m in results['results'][1:5]:
-            t = urllib.quote(m['title'].encode('utf-8'))  # percent encoded
-            link = 'search?q=' + t + '&mtype=' + qtype + '&id=' + str(m['id'])
-            x = {'link': link, 'title': m['title']}
+            # t = urllib.quote(m['title'].encode('utf-8'))  # percent encoded
+            x = {'link': url_for('search', mtype=mtype, gbid=str(m['id'])), 'title': m['title']}
             # if (m['wikipedia_id'] != 0) and (m['wikipedia_id'] is not None):
             other_results.append(x)  # only keep if not very obscure
 
     # logs dictionaries retrieved, either from db or api
-    if not link_id:
+    if query:
+        logging.info('user query: ' + query)
+        print 'user query: ', query
         logResults = open('log/search_results.log', 'w')
         pprint.pprint(results, logResults)
         logResults.close()
@@ -136,7 +133,7 @@ def search():
         logMedia.close()
 
     return render_template('index.html', media=media, query=query,
-                           qtype=qtype, other_results=other_results)
+                           mtype=mtype, other_results=other_results)
 
 if __name__ == "__main__":
     app.run(debug=True, host='0.0.0.0', port=8181)

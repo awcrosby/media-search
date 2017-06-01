@@ -13,7 +13,7 @@
         <div class="six columns" style="margin-left: 3px">
           <select name="mtype">
             <option value="movie">Search Movies</option>
-            <option value="show" {% if qtype == 'show' %} selected {% endif %}>Search Shows</option>
+            <option value="show" {% if mtype == 'show' %} selected {% endif %}>Search Shows</option>
           </select> 
           <input type="submit" class="button-primary" value="Search">
         </div>
@@ -26,7 +26,7 @@
         <div style="margin-top: 15px">  
           <img class="u-pull-left" style="margin-right: 2%" src="{{ media['img'] }}" alt="Media result image" />
           <div>
-            The {{ qtype }} <strong>{{ media['title'] }} ({{ media['year'] }})</strong>
+            The {{ mtype }} <strong>{{ media['title'] }} ({{ media['year'] }})</strong>
             <a href='http://www.imdb.com/title/{{ media['imdb'] }}'>imdb</a>
             is available on these streaming services:
           </div>
@@ -60,7 +60,7 @@
               {% endif %}
 
               <!-- display source info -->
-              {% if qtype == 'show' %}
+              {% if mtype == 'show' %}
                   <div class="sourceinfo">
                     {{ s['epcount'] }} <a href={{ s['link'] }}>episodes</a>
                     in season(s): {{ ', '.join(s['seasons']) }}
@@ -88,14 +88,14 @@
  
     {% elif media %}  <!-- end-result-ui: search results without a source -->
         <p>
-          The {{ qtype }} <strong>{{ media['title'] }} ({{ media['year'] }})</strong>
+          The {{ mtype }} <strong>{{ media['title'] }} ({{ media['year'] }})</strong>
           <a href='http://www.imdb.com/title/{{ media['imdb'] }}'>imdb</a>
           doesn't seem available on these streaming services.
         </p>
 
 
     {% elif query %}  <!-- end-result-ui: no search results -->
-        <p>Your search for "{{ query }}" did not match any {{ qtype }} results.</p>
+        <p>Your search for "{{ query }}" did not match any {{ mtype }} results.</p>
     {% endif %}
 
 
