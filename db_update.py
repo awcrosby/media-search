@@ -4,7 +4,8 @@ import guidebox
 import pymongo
 import time
 import logging
-from shared_func import get_all_ep
+import sys
+from shared_func import get_show_ep, get_all_ep
 
 '''db_update.py script populates and updates database daily
     add to mongo database any new top-popular shows and movies
@@ -17,11 +18,15 @@ def main():
     db = client.MediaData
     guidebox.api_key = json.loads(open('/home/awcrosby/media-search/'
                                   'apikeys.json').read())['guidebox']
-    halfday_ago = int(time.time() - 44100)  # 12hr 15min ago to ensure overlap
+    time_ago = int(time.time() - 612000)  # week and 2hr ago
     logging.basicConfig(filename='/home/awcrosby/media-search/'
                         'log/db_update.log',
                         format='%(asctime)s %(levelname)s: %(message)s',
                         level=logging.INFO)
+    sys.stdout = open('/home/awcrosby/media-search/log/db_update.log', 'a')
+    print 'before api requests:'
+    guidebox.Quota.retrieve()
+    mv_new, mv_to_update, sh_new, sh_to_update = ([], [], [], [])
 
     ''' one-time db statements: create/view indexes, del all docs in col '''
     # db.Movies.create_index([('id', pymongo.ASCENDING)], unique=True)
@@ -31,94 +36,98 @@ def main():
     # print db.Movies.delete_many({})  # delete all movies in database
     # import q; q.d()
 
-    # get initial dictionary with many guidebox popular movies
-    mov_limit = 300
-    page_len = 50
-    gb_movs = guidebox.Movie.list(limit=page_len)
-
-    # get the additional pages of popular movies
-    for i in range(1, mov_limit/page_len):
+    ''' Section for movies '''
+    # get list of new popular movies to add to database
+    mov_limit = 100
+    page_len = 100
+    mv_pop = guidebox.Movie.list(limit=page_len)  # initial dictionary
+    for i in range(1, mov_limit/page_len):  # more pages if needed
         nextpage = guidebox.Movie.list(limit=page_len, offset=page_len*i)
-        gb_movs['results'] += nextpage['results']
-
-    # get list of new movie ids, based on popular and existing mongodb
-    pop_ids = [m['id'] for m in gb_movs['results']]
-    mon_ids = [m['id'] for m in db.Movies.find()]
-    new_ids = list(set(pop_ids) - set(mon_ids))
+        mv_pop['results'] += nextpage['results']
+    mv_pop = [m['id'] for m in mv_pop['results']]
+    mv_db = [m['id'] for m in db.Movies.find()]
+    mv_new = list(set(mv_pop) - set(mv_db))
 
     # for all new movies get guidebox info and write to mongodb
-    for gbid in new_ids:
+    for gbid in mv_new:
         mov_detail = guidebox.Movie.retrieve(id=gbid)
         db.Movies.insert_one(mov_detail)
         logging.info('movie added: ' + mov_detail['title'])
 
-    # get list of movies to update, based on guidebox updates and mongodb
-    chg = get_updates(media='movie', update='changes', time=halfday_ago)
-    chg_ids = [m['id'] for m in chg['results']]
-    mon_ids = [m['id'] for m in db.Movies.find()]
-    to_update_ids = list(set(chg_ids) & set(mon_ids))  # takes set intersection
+    # get movie ids with updates / to update
+    mv_chg = get_updates(obj='movie', typ='changes', time=time_ago)
+    mv_chg = [m['id'] for m in mv_chg['results']]
+    mv_db = [m['id'] for m in db.Movies.find()]
+    mv_to_update = list(set(mv_chg) & set(mv_db))
 
     # del from mongodb and replace movies that have updates
-    for gbid in to_update_ids:
+    for gbid in mv_to_update:
         db.Movies.remove({'id': gbid})
         mov_detail = guidebox.Movie.retrieve(id=gbid)
         db.Movies.insert_one(mov_detail)
         logging.info('movie updated: ' + mov_detail['title'])
 
     ''' Section for shows '''
-    # get initial dictionary with many guidebox popular shows
-    show_limit = 300
-    page_len = 50
-    gb_shows = guidebox.Show.list(limit=page_len)
-
-    # get the additional pages of popular shows
-    for i in range(1, show_limit/page_len):
+    # get list of new popular movies to add to database
+    show_limit = 100
+    page_len = 100
+    sh_pop = guidebox.Show.list(limit=page_len)  #initial dictionary
+    for i in range(1, show_limit/page_len):  # more pages if needed
         nextpage = guidebox.Show.list(limit=page_len, offset=page_len*i)
-        gb_shows['results'] += nextpage['results']
-
-    # get list of new show ids, based on popular and existing mongodb
-    pop_ids = [m['id'] for m in gb_shows['results']]
-    mon_ids = [m['id'] for m in db.Shows.find()]
-    new_ids = list(set(pop_ids) - set(mon_ids))
+        sh_pop['results'] += nextpage['results']
+    sh_pop = [m['id'] for m in sh_pop['results']]
+    sh_db = [s['id'] for s in db.Shows.find()]
+    sh_new = list(set(sh_pop) - set(sh_db))
 
     # for all new shows get guidebox episodes and write to mongodb
-    for gbid in new_ids:
-        show_ep = get_all_ep(gbid)
+    for gbid in sh_new:
+        show_ep = get_show_ep(gbid)
         db.Shows.insert_one(show_ep)
         logging.info('show added: ' + show_ep['title'])
 
-    # get list of all show ids updated, and ids to update
-    chg = get_updates(media='show', update='changes', time=halfday_ago)
-    newep = get_updates(media='show', update='new_episodes', time=halfday_ago)
-    chgep = get_updates(media='show', update='changed_episodes',
-                        time=halfday_ago)
+    # get show ids with updates (show changes, changed ep, new ep) / to update
+    sh_chgep = get_updates(obj='show', typ='changed_episodes', time=time_ago)
+    sh_chgep = [e['id'] for e in sh_chgep['results']]
+    sh_newep = get_updates(obj='show', typ='new_episodes', time=time_ago)
+    sh_newep = [e['id'] for e in sh_newep['results']]
+    sh_updated = list(set(sh_chgep + sh_newep))
+    sh_db = [s['id'] for s in db.Shows.find()]
+    sh_to_update = list(set(sh_updated) & set(sh_db))
 
-    chg_ids = [m['id'] for m in chg['results']]
-    newep_ids = [m['id'] for m in newep['results']]
-    chgep_ids = [m['id'] for m in chgep['results']]
-    updated_ids = list(set(chg_ids + newep_ids + chgep_ids))  # unique items
+    # update episode portion of show_episode dictionary
+    for gbid in sh_to_update:
+        show_ep_db = db.Shows.find_one({'id': gbid})
+        episodes = get_all_ep(gbid)
 
-    mon_ids = [m['id'] for m in db.Shows.find()]
-    to_update_ids = list(set(updated_ids) & set(mon_ids))  # set intersection
+        # add show info to the episodes
+        episodes['id'] = gbid
+        episodes['imdb_id'] = show_ep_db['imdb_id']
+        episodes['title'] = show_ep_db['title']
+        episodes['year'] = show_ep_db['year']
+        episodes['img'] = show_ep_db['img']
 
-    # del from mongodb and replace shows that have updates
-    for gbid in to_update_ids:
-        db.Shows.remove({'id': gbid})
-        show_ep = get_all_ep(gbid=gbid)
-        db.Shows.insert_one(show_ep)
-        logging.info('show updated: ' + show_ep['title'])
+        # update the show_episode dict in the database
+        db.Shows.update_one({'id': gbid}, {'$set': episodes})
+        logging.info('show updated: ' + show_ep_db['title'])
 
     # log database counts
+    logging.info('movies added: ' + str(len(mv_new)))
+    logging.info('movies updated: ' + str(len(mv_to_update)))
+    logging.info('shows added: ' + str(len(sh_new)))
+    logging.info('shows updated: ' + str(len(sh_to_update)))
+    print 'after api requests:'
+    guidebox.Quota.retrieve()
+    sys.stdout.close()
     logging.info('database counts - movies: ' + str(db.Movies.count()) +
                  ', shows: ' + str(db.Shows.count()))
 
 
-def get_updates(media, update, time):
+def get_updates(obj, typ, time):
     page_len = 500
-    updates = guidebox.Update.all(object=media, type=update,
+    updates = guidebox.Update.all(object=obj, type=typ,
                                   time=time, limit=page_len)
     for i in range(1, updates['total_pages']):  # get extra pages if pages > 1
-        nextpage = guidebox.Update.all(object=media, type=update,
+        nextpage = guidebox.Update.all(object=obj, type=typ,
                                        time=time, limit=page_len,
                                        offset=page_len*i)
         updates['results'] += nextpage['results']  # append to results

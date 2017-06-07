@@ -94,29 +94,39 @@ def add_src_display(media, mtype):
     return media
         
 
+def get_show_ep(gbid):
+    guidebox.api_key = json.loads(open('/home/awcrosby/media-search/'
+                                  'apikeys.json').read())['guidebox']
+
+    # get high-level show info, get episodes for show
+    show = guidebox.Show.retrieve(id=gbid)    
+    show_ep = get_all_ep(gbid)
+
+    # add high-level show info to dict with all episodes
+    show_ep['id'] = gbid  # add a key to dictionary to allow lookup
+    show_ep['imdb_id'] = show['imdb_id']
+    show_ep['title'] = show['title']
+    show_ep['year'] = show['first_aired'][:4]
+    show_ep['img'] = show['artwork_208x117']
+
+    return show_ep
+
 def get_all_ep(gbid):
     guidebox.api_key = json.loads(open('/home/awcrosby/media-search/'
                                   'apikeys.json').read())['guidebox']
-    # get high-level show info
-    show = guidebox.Show.retrieve(id=gbid)
 
     # get dictionary with many episodes
     page_len = 100
     episodes = guidebox.Show.episodes(id=gbid, include_links=True,
+                                      reverse_ordering=True,
                                       limit=page_len)
 
     # get more pages of ep, only if results are greater than page_len
     for i in range(1, episodes['total_results']/page_len + 1):
         nextpage = guidebox.Show.episodes(id=gbid, include_links=True,
+                                          reverse_ordering=True,
                                           limit=page_len,
                                           offset=page_len*i)
         episodes['results'] += nextpage['results']
-
-    # add high-level show info to dict with all episodes
-    episodes['id'] = gbid  # add a key to dictionary to allow lookup
-    episodes['imdb_id'] = show['imdb_id']
-    episodes['title'] = show['title']
-    episodes['year'] = show['first_aired'][:4]
-    episodes['img'] = show['artwork_208x117']
 
     return episodes
