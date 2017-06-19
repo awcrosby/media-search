@@ -105,8 +105,7 @@ def search(mtype='movie', gbid=None, query=''):
             db.Shows.insert_one(media.copy()) #copy keeps JSON serializeable
             logging.info('show added: ' + media['title'])
         logging.info('show db/api request time: ' + str(time.time() - start))
-        print 'show db/api request time: ', time.time() - start
-        print 'gbid: ', gbid
+        print 'show db/api request time:', time.time() - start, 'gbid:', gbid
 
         # add display sources to the show_ep dict
         media = add_src_display(media, 'show')
@@ -130,7 +129,7 @@ def search(mtype='movie', gbid=None, query=''):
     # logs dictionaries retrieved, either from db or api
     if query:
         logging.info('user query: ' + query)
-        print 'user query: ', query
+        print 'user query:', query
         logResults = open('log/search_results.log', 'w')
         pprint.pprint(results, logResults)
         logResults.close()

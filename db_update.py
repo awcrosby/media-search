@@ -38,7 +38,7 @@ def main():
 
     ''' Section for movies '''
     # get list of new popular movies to add to database
-    mov_limit = 100
+    mov_limit = 200
     page_len = 100
     mv_pop = guidebox.Movie.list(limit=page_len)  # initial dictionary
     for i in range(1, mov_limit/page_len):  # more pages if needed
@@ -69,7 +69,7 @@ def main():
 
     ''' Section for shows '''
     # get list of new popular movies to add to database
-    show_limit = 100
+    show_limit = 200
     page_len = 100
     sh_pop = guidebox.Show.list(limit=page_len)  #initial dictionary
     for i in range(1, show_limit/page_len):  # more pages if needed
