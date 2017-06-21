@@ -31,6 +31,7 @@ def main():
     ''' one-time db statements: create/view indexes, del all docs in col '''
     # db.Movies.create_index([('id', pymongo.ASCENDING)], unique=True)
     # db.Shows.create_index([('id', pymongo.ASCENDING)], unique=True)
+    # db.Users.create_index('email', unique=True)
     # print sorted(list(db.Shows.index_information()))
     # print db.Shows.delete_many({})  # delete all shows in database
     # print db.Movies.delete_many({})  # delete all movies in database

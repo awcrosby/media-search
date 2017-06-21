@@ -1,8 +1,39 @@
 #!/usr/bin/env python
 import json
 import guidebox
+import pymongo
+import time
+import logging
 
 '''shared functionality between web flaskapp and backend db_update script'''
+
+def get_media(gbid, mtype):
+    # prepare for database and api access
+    client = pymongo.MongoClient('localhost', 27017)
+    db = client.MediaData
+    guidebox.api_key = json.loads(open('apikeys.json').read())['guidebox']
+    start = time.time()
+
+    # get media details from mongodb, or api search + add to mongodb
+    if mtype == 'movie':
+        media = db.Movies.find_one({'id': gbid})
+        if not media:
+            media = guidebox.Movie.retrieve(id=gbid)
+            db.Movies.insert_one(media.copy()) #copy keeps JSON serializeable
+            logging.info('movie added: ' + media['title'])
+        logging.info('movie db/api request time: ' + str(time.time() - start))
+        print 'movie db/api request time: ', time.time() - start
+    elif mtype == 'show':
+        media = db.Shows.find_one({'id': gbid})
+        if not media:
+            media = get_show_ep(gbid)
+            db.Shows.insert_one(media.copy()) #copy keeps JSON serializeable
+            logging.info('show added: ' + media['title'])
+        logging.info('show db/api request time: ' + str(time.time() - start))
+        print 'show db/api request time:', time.time() - start, 'gbid:', gbid
+
+    client.close()
+    return media
 
 def add_src_display(media, mtype):
     # set source types to look for, init src_display_list
