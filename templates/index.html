@@ -6,7 +6,7 @@
     </div>
 
     <div class="row">  <!-- search box and buttons-->
-      <form action="/search" method="get">
+      <form method="GET" action="/search">
         <div class="six columns" style="margin-right: 3px">
           <input type="text" class="u-full-width" placeholder="Terminator ... Mockingjay 2 ... Broad City ...  InuYasha" name="q" value="{{ query }}" autofocus>
         </div>
@@ -30,6 +30,14 @@
             <a href='http://www.imdb.com/title/{{ media['imdb'] }}'>imdb</a>
             is available on these streaming services:
           </div>
+        </div>
+        <div>
+          <form method="POST" action="/edit_watchlist">
+            <input type="hidden" name="operation" value="add" />
+            <input type="hidden" name="mtype" value="{{ mtype }}" />
+            <input type="hidden" name="gbid" value="{{ media['id'] }}" />
+            <button type="submit" class="btn">+</button>
+          </form>
         </div>
         <div class="u-cf" style="margin-bottom: 15px"></div>
         <br>

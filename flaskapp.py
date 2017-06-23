@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from flask import Flask, render_template, request, url_for
+from flask import Flask, render_template, request, redirect, url_for
 import json
 import guidebox
 import time
@@ -27,10 +27,33 @@ def home():
     return render_template('index.html')
 
 
-@app.route('/sleep')
-def sleep():
-    time.sleep(30)
-    return '30 seconds have passed'
+@app.route('/edit_watchlist', methods=['GET', 'POST'])
+def edit_watchlist():
+    if request.method == 'POST':
+        # connect to db, get user, get form data
+        client = pymongo.MongoClient('localhost', 27017)
+        db = client.MediaData
+        email = 'awcrosby@gmail.com'  # in future get this from session
+        operation = request.form['operation']
+        mtype = request.form['mtype']
+        gbid = int(request.form['gbid'])
+
+        # update the queue for movie or show
+        if operation == 'add' and mtype == 'movie':
+            db.Users.find_one_and_update({'email': email},
+                                         {'$push': {'movieq': gbid}})
+        elif operation == 'add' and mtype == 'show':
+            db.Users.find_one_and_update({'email': email},
+                                         {'$push': {'showq': gbid}})
+        elif operation == 'delete' and mtype == 'movie':
+            db.Users.find_one_and_update({'email': email},
+                                         {'$pull': {'movieq': gbid}})
+        elif operation == 'delete' and mtype == 'show':
+            db.Users.find_one_and_update({'email': email},
+                                         {'$pull': {'showq': gbid}})
+        client.close()
+    return redirect(url_for('watchlist'))
+
 
 @app.route('/watchlist')
 def watchlist():
@@ -98,7 +121,7 @@ def search(mtype='movie', gbid=None, query=''):
     # get media details from mongodb, or api search + add to mongodb
     media = get_media(gbid, mtype)
 
-    # add display sources to the show_ep dict
+    # add display sources to the movie or show_ep dict
     media = add_src_display(media, mtype)
 
     # build other_results to send to template, if query was performed
