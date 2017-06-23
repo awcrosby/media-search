@@ -40,3 +40,15 @@
 .sourceinfo {
     margin: 3px 0px 6px 0px;  /* top right bottom left */
 }
+
+.button-del {
+    background:none!important;
+    border:none; 
+    padding:0!important;
+
+    /*optional*/
+    font-family:arial,sans-serif; /*input has OS specific font-family*/
+    color:#069;
+    text-decoration:underline;
+    cursor:pointer;
+}

@@ -1,0 +1,61 @@
+{% extends 'layout.html' %}
+
+{% block body %}
+    <div style="margin-top: 6%">  <!-- introduction -->
+      <h4>Watchlist</h4>
+    </div>
+
+    {% for m in medias %}
+        <div style="font-size:80%;">
+          {% if m['mtype'] == 'show' %}
+              {{ '\U0001F4FA' }}
+          {% else %}
+              {{ '\U0001F3A5' }}
+          {% endif %}
+          {{ m['title'] }}
+          {% for s in m['src_display'] %}
+              | {{ s['display_name'] }}
+              <a href={{ s['link'] }}>watch</a>
+              <a href=placeholder.html>signup</a>
+          {% endfor %}
+        </div>
+        <div class="u-cf"></div>
+    {% endfor %}
+
+    <table>
+      <tr>
+        <th>Type</th>
+        <th>Title</th>
+        <th>Sources</th>
+        <th></th>
+      </tr>
+      {% for m in medias %}
+        <tr>
+          <td>
+            {% if m['mtype'] == 'show' %}
+                {{ '\U0001F4FA' }}
+            {% else %}
+                {{ '\U0001F3A5' }}
+            {% endif %}
+          </td>
+          <td>{{ m['title'] }}</td>
+          <td>
+            {% for s in m['src_display'] %}
+                | {{ s['display_name'] }}
+                <a href={{ s['link'] }}>watch</a>
+                <a href=placeholder.html>signup</a>
+            {% endfor %}
+          </td>
+          <td>
+            <form method="POST" action="/edit_watchlist">
+              <input type="hidden" name="operation" value="delete" />
+              <input type="hidden" name="mtype" value="{{ m['mtype'] }}" />
+              <input type="hidden" name="gbid" value="{{ m['id'] }}" />
+              <button type="submit" class="button-del">Delete</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+    </table>
+
+{% endblock %}

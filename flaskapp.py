@@ -81,7 +81,7 @@ def watchlist():
 
     client.close()
     print 'time to get media of full watchlist: ', time.time() - start
-    return render_template('list.html', medias=watchlist)
+    return render_template('watchlist.html', medias=watchlist)
 
 @app.route('/<mtype>/id/<int:gbid>')
 @app.route('/search', methods=['GET'])
