@@ -1,10 +1,10 @@
 {% extends 'layout.html' %}
+{% set active_page = "watchlist" %}
 
 {% block body %}
-    <div style="margin-top: 6%">  <!-- introduction -->
-      <h4>Watchlist</h4>
-    </div>
+    {% include 'includes/_searchbar.html' %}
 
+    <div class="clearfix" style="margin-bottom: 20px"></div>
     <table>
       <tr>
         <th></th>
@@ -18,7 +18,8 @@
             {% if m['mtype'] == 'show' %}
                 {{ '\U0001F4FA' }}
             {% else %}
-                {{ '\U0001F3A5' }}
+                <span class="glyphicon glyphicon-film" aria-hidden="true"></span>
+                <!-- {{ '\U0001F3A5' }} -->
             {% endif %}
           </td>
           <td>{{ m['title'] }}</td>

@@ -1,26 +1,11 @@
 {% extends 'layout.html' %}
 
 {% block body %}
-    <div style="margin-top: 6%">  <!-- introduction -->
+    <div>  <!-- introduction -->
       <h4>Find if a movie/show is streaming on Netflix, HBO, Hulu, Amazon Prime, or Showtime</h4>
     </div>
 
-    <div class="row">  <!-- search box and buttons-->
-      <form method="GET" action="/search">
-        <div class="col-md-5">
-          <input type="text" class="form-control" placeholder="Terminator ... Mockingjay 2 ... Broad City ...  InuYasha" name="q" value="{{ query }}" autofocus>
-        </div>
-        <div class="col-md-2">
-          <select name="mtype" class="form-control">
-            <option value="movie">Search Movies</option>
-            <option value="show" {% if mtype == 'show' %} selected {% endif %}>Search Shows</option>
-          </select> 
-        </div>
-        <div class="col-md-2">
-          <input type="submit" class="btn btn-primary" value="Search">
-        </div>
-      </form>
-    </div>
+    {% include 'includes/_searchbar.html' %}
 
     <!-- end-result-ui: a source was found -->
     {% if media and media['src_display'] %}
