@@ -5,26 +5,9 @@
       <h4>Watchlist</h4>
     </div>
 
-    {% for m in medias %}
-        <div style="font-size:80%;">
-          {% if m['mtype'] == 'show' %}
-              {{ '\U0001F4FA' }}
-          {% else %}
-              {{ '\U0001F3A5' }}
-          {% endif %}
-          {{ m['title'] }}
-          {% for s in m['src_display'] %}
-              | {{ s['display_name'] }}
-              <a href={{ s['link'] }}>watch</a>
-              <a href=placeholder.html>signup</a>
-          {% endfor %}
-        </div>
-        <div class="u-cf"></div>
-    {% endfor %}
-
     <table>
       <tr>
-        <th>Type</th>
+        <th></th>
         <th>Title</th>
         <th>Sources</th>
         <th></th>
@@ -41,12 +24,13 @@
           <td>{{ m['title'] }}</td>
           <td>
             {% for s in m['src_display'] %}
-                | {{ s['display_name'] }}
+                {{ s['display_name'] }}
                 <a href={{ s['link'] }}>watch</a>
                 <a href=placeholder.html>signup</a>
             {% endfor %}
           </td>
           <td>
+            <!-- delete link that removes media item from watchlist -->
             <form method="POST" action="/edit_watchlist">
               <input type="hidden" name="operation" value="delete" />
               <input type="hidden" name="mtype" value="{{ m['mtype'] }}" />

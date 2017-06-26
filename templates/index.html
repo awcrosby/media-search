@@ -7,15 +7,17 @@
 
     <div class="row">  <!-- search box and buttons-->
       <form method="GET" action="/search">
-        <div class="six columns" style="margin-right: 3px">
-          <input type="text" class="u-full-width" placeholder="Terminator ... Mockingjay 2 ... Broad City ...  InuYasha" name="q" value="{{ query }}" autofocus>
+        <div class="col-md-5">
+          <input type="text" class="form-control" placeholder="Terminator ... Mockingjay 2 ... Broad City ...  InuYasha" name="q" value="{{ query }}" autofocus>
         </div>
-        <div class="six columns" style="margin-left: 3px">
-          <select name="mtype">
+        <div class="col-md-2">
+          <select name="mtype" class="form-control">
             <option value="movie">Search Movies</option>
             <option value="show" {% if mtype == 'show' %} selected {% endif %}>Search Shows</option>
           </select> 
-          <input type="submit" class="button-primary" value="Search">
+        </div>
+        <div class="col-md-2">
+          <input type="submit" class="btn btn-primary" value="Search">
         </div>
       </form>
     </div>
@@ -23,24 +25,25 @@
     <!-- end-result-ui: a source was found -->
     {% if media and media['src_display'] %}
         <!-- box with media image and description -->
-        <div style="margin-top: 15px">  
-          <img class="u-pull-left" style="margin-right: 2%" src="{{ media['img'] }}" alt="Media result image" />
-          <div>
+        <div class="clearfix" style="margin-bottom: 20px"></div>
+        <div class="row">
+          <div class="col-md-2">  
+            <img style="margin-right: 2%" src="{{ media['img'] }}" alt="Media result image" />
+          </div>
+          <div class="col-md-10">
             The {{ mtype }} <strong>{{ media['title'] }} ({{ media['year'] }})</strong>
             <a href='http://www.imdb.com/title/{{ media['imdb'] }}'>imdb</a>
             is available on these streaming services:
+            <form method="POST" action="/edit_watchlist">
+              <input type="hidden" name="operation" value="add" />
+              <input type="hidden" name="mtype" value="{{ mtype }}" />
+              <input type="hidden" name="gbid" value="{{ media['id'] }}" />
+              <button type="submit" class="btn">+</button>
+            </form>
           </div>
         </div>
-        <div>
-          <form method="POST" action="/edit_watchlist">
-            <input type="hidden" name="operation" value="add" />
-            <input type="hidden" name="mtype" value="{{ mtype }}" />
-            <input type="hidden" name="gbid" value="{{ media['id'] }}" />
-            <button type="submit" class="btn">+</button>
-          </form>
-        </div>
-        <div class="u-cf" style="margin-bottom: 15px"></div>
-        <br>
+
+        <div class="clearfix" style="margin-bottom: 30px"></div>
 
         {% for s in media['src_display'] %}
             <!-- display logo or title in source boxes -->
@@ -91,7 +94,7 @@
             </div>
         {% endfor %}
 
-        <div class="u-cf" style="margin-bottom: 15px"></div>
+        <div class="clearfix" style="margin-bottom: 15px"></div>
 
  
     {% elif media %}  <!-- end-result-ui: search results without a source -->
@@ -108,7 +111,7 @@
 
 
     {% if other_results %}  <!-- end-result-ui: list other search results -->
-        <div class="u-cf" style="margin-bottom: 2rem">
+        <div class="clearfix" style="margin-bottom: 2rem">
           <br>...or did you mean?:
           {% for item in other_results %}
               <a href="{{ item['link'] }}">{{ item['title'] }}</a> &nbsp;

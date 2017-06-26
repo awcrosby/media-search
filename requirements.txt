@@ -21,5 +21,5 @@ Werkzeug==0.12.1
 # APIs: Guidebox
 # Database: mongodb
 # Script: daily crontab run python script to write api updates to db
-# UI: Jinja templates via flask, boilerplate CSS via skeleton
+# UI: Jinja templates via flask, bootstrap css/js framework
 # Logging: python built-in logging for flaskapp and db_update
