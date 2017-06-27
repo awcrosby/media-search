@@ -33,7 +33,6 @@ def get_media(gbid, mtype):
         logging.info('show db/api request time: ' + str(time.time() - start))
         print 'show db/api request time:', time.time() - start, 'gbid:', gbid
 
-    client.close()
     return media
 
 

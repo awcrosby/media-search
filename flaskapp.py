@@ -142,7 +142,7 @@ def edit_watchlist():
                                              {'$push': {'movieq': gbid}})
                 flash('Movie added to watchlist', 'success')
             else:
-                flash('Movie already in watchlist', 'info')
+                flash('Movie already in watchlist', 'danger')
         elif operation == 'add' and mtype == 'show':
             user = db.Users.find_one({'email': email})
             if gbid not in user['showq']:
@@ -201,18 +201,43 @@ def watchlist():
 @app.route('/search', methods=['GET'])
 def search(mtype='movie', query=''):
     query = request.args.get('q')  # can be string or NoneType
-    mtype = 'movie' if request.args.get('mtype') != 'show' else 'show'
-    if not query:
+    mtype = request.args.get('mtype')
+    session['dropdown'] = mtype
+
+    if not query or (mtype not in ['movie', 'show', 'all']):
         return render_template('home.html')
     query = query.strip()
 
     guidebox.api_key = json.loads(open('apikeys.json').read())['guidebox']
 
+    if mtype == 'all':
+        # search both movie and show, first get high-level results
+        mv = guidebox.Search.movies(field='title', query=query)
+        sh = guidebox.Search.shows(field='title', query=query)
+
+        # if neither return a result
+        if (mv['total_results'] + sh['total_results'] == 0):
+            return render_template('search.html', isresult=0,
+                                   query=query, mtype='media')
+
+        # if only one returns a result (skips the 'did you mean...' section)
+        elif mv['total_results'] == 0:
+            return redirect(url_for('lookup', mtype='show',
+                            gbid=sh['results'][0]['id']))
+        elif sh['total_results'] == 0:
+            return redirect(url_for('lookup', mtype='movie',
+                            gbid=mv['results'][0]['id']))
+
+        # display movie/show results on intermediate page (no sources)
+        else:
+            return render_template('mixedresults.html', shows=sh, movies=mv,
+                                   query=query)
+
     if mtype == 'movie':
         # get movie query results, take top result
         results = guidebox.Search.movies(field='title', query=query)
         if not (results['total_results'] > 0):  # exit early if no results
-            return render_template('index.html', isresult=0,
+            return render_template('search.html', isresult=0,
                                    query=query, mtype=mtype)
         gbid = results['results'][0]['id']  # take first result
 
@@ -220,7 +245,7 @@ def search(mtype='movie', query=''):
         # get show query results, and take top result
         results = guidebox.Search.shows(field='title', query=query)
         if not (results['total_results'] > 0):  # exit early if no results
-            return render_template('index.html', isresult=0,
+            return render_template('search.html', isresult=0,
                                    query=query, mtype=mtype)
         gbid = results['results'][0]['id']  # take first result
 

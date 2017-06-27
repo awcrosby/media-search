@@ -1,0 +1,33 @@
+{% extends 'layout.html' %}
+
+{% block body %}
+    <div>
+      <h4>Find if a movie/show is streaming on Netflix, HBO, Hulu, Amazon Prime, or Showtime</h4>
+    </div>
+
+    {% include 'includes/_searchbar.html' %}
+
+    <h3>Movie + Show results for: <strong>{{ query }}</strong></h3>
+    <div class="row">
+      {% for mv in movies['results'][:3] %}
+          <div class="col-md-2">
+            <div>Movie:</div>
+            <a href="{{ url_for('lookup', mtype='movie', gbid=mv['id'])}}">
+              <img style="width:100px;" src="{{ mv['poster_120x171'] }}">
+              <div>{{ mv['title'] }} ({{ mv['release_year'] }})</div>
+            </a>
+          </div>
+      {% endfor %}
+
+      {% for sh in shows['results'][:3] %}
+          <div class="col-md-2">
+            <div>Show:</div>
+            <a href="{{ url_for('lookup', mtype='show', gbid=sh['id'])}}">
+              <img style="width:156px;" src="{{ sh['artwork_208x117'] }}"> 
+              <div>{{ sh['title'] }} ({{ sh['first_aired'][:4]}})</div>
+            </a>
+          </div>
+      {% endfor %}
+    </div>
+
+{% endblock %}

@@ -1,16 +1,25 @@
 <div class="row">
   <form method="GET" action="/search">
+
     <div class="col-md-5">
       <input type="text" class="form-control" placeholder="search movies or shows" name="q" value="{{ query }}" autofocus>
     </div>
-    <div class="col-md-2">
-      <select name="mtype" class="form-control">
-        <option value="movie">Search Movies</option>
-        <option value="show" {% if mtype == 'show' %} selected {% endif %}>Search Shows</option>
-      </select>
+
+    <div class="col-md-5">
+      <label class="radio-inline">
+        <input type="radio" name="mtype" value="movie" checked>
+        Movies
+      </label>
+      <label class="radio-inline">
+        <input type="radio" name="mtype" value="show" {% if session['dropdown'] == 'show' %} checked {% endif %}>
+        Shows
+      </label>
+      <label class="radio-inline">
+        <input type="radio" name="mtype" value="all" {% if session['dropdown'] == 'all' %} checked {% endif %}>
+        All
+      </label>
+      <input type="submit" style="margin-left: 20px;" class="btn btn-primary" value="Search">
     </div>
-    <div class="col-md-2">
-      <input type="submit" class="btn btn-primary" value="Search">
-    </div>
+
   </form>
 </div>
