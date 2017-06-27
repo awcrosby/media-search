@@ -72,7 +72,7 @@ def main():
     # get list of new popular movies to add to database
     show_limit = 200
     page_len = 100
-    sh_pop = guidebox.Show.list(limit=page_len)  #initial dictionary
+    sh_pop = guidebox.Show.list(limit=page_len)  # initial dictionary
     for i in range(1, show_limit/page_len):  # more pages if needed
         nextpage = guidebox.Show.list(limit=page_len, offset=page_len*i)
         sh_pop['results'] += nextpage['results']

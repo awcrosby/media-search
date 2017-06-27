@@ -7,6 +7,7 @@ import logging
 
 '''shared functionality between web flaskapp and backend db_update script'''
 
+
 def get_media(gbid, mtype):
     # prepare for database and api access
     client = pymongo.MongoClient('localhost', 27017)
@@ -19,7 +20,7 @@ def get_media(gbid, mtype):
         media = db.Movies.find_one({'id': gbid})
         if not media:
             media = guidebox.Movie.retrieve(id=gbid)
-            db.Movies.insert_one(media.copy()) #copy keeps JSON serializeable
+            db.Movies.insert_one(media.copy())  # copy keeps JSON serializeable
             logging.info('movie added: ' + media['title'])
         logging.info('movie db/api request time: ' + str(time.time() - start))
         print 'movie db/api request time: ', time.time() - start
@@ -27,13 +28,14 @@ def get_media(gbid, mtype):
         media = db.Shows.find_one({'id': gbid})
         if not media:
             media = get_show_ep(gbid)
-            db.Shows.insert_one(media.copy()) #copy keeps JSON serializeable
+            db.Shows.insert_one(media.copy())  # copy keeps JSON serializeable
             logging.info('show added: ' + media['title'])
         logging.info('show db/api request time: ' + str(time.time() - start))
         print 'show db/api request time:', time.time() - start, 'gbid:', gbid
 
     client.close()
     return media
+
 
 def add_src_display(media, mtype):
     # set source types to look for, init src_display_list
@@ -123,14 +125,14 @@ def add_src_display(media, mtype):
     media['mtype'] = mtype
 
     return media
-        
+
 
 def get_show_ep(gbid):
     guidebox.api_key = json.loads(open('/home/awcrosby/media-search/'
                                   'apikeys.json').read())['guidebox']
 
     # get high-level show info, get episodes for show
-    show = guidebox.Show.retrieve(id=gbid)    
+    show = guidebox.Show.retrieve(id=gbid)
     show_ep = get_all_ep(gbid)
 
     # add high-level show info to dict with all episodes
@@ -139,8 +141,10 @@ def get_show_ep(gbid):
     show_ep['title'] = show['title']
     show_ep['year'] = show['first_aired'][:4]
     show_ep['img'] = show['artwork_208x117']
+    show_ep['overview'] = show['overview']
 
     return show_ep
+
 
 def get_all_ep(gbid):
     guidebox.api_key = json.loads(open('/home/awcrosby/media-search/'

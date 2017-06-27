@@ -1,25 +1,35 @@
 appdirs==1.4.3
 click==6.7
+enum-compat==0.0.2
+enum34==1.1.6
+eventlet==0.21.0
 Flask==0.12
+Flask-WTF==0.14.2
+gevent==1.2.1
+greenlet==0.4.12
 guidebox==1.0.2
+gunicorn==19.7.1
 itsdangerous==0.24
 Jinja2==2.9.5
 MarkupSafe==1.0
 packaging==16.8
+passlib==1.7.1
 pep8==1.7.0
+pymongo==3.4.0
 pyparsing==2.2.0
 q==2.6
 requests==2.13.0
 six==1.10.0
 Werkzeug==0.12.1
-# ==System Pieces==
+WTForms==2.1
+# -----System Pieces-----
 # Hosting: Digital Ocean, ubuntu
 # Networking: ufw firewall port access, and iptables port redirect
 # Application: site to resolve media query and display data from db or api
-# Webframework: flask
+# Webframework: flask with jinja templates
 # Dev Environment: python2.7, git, vim, tmux, virtualenv, mobaxterm ssh
 # APIs: Guidebox
 # Database: mongodb
 # Script: daily crontab run python script to write api updates to db
-# UI: Jinja templates via flask, bootstrap css/js framework
+# UI: bootstrap css/js framework, flash messaging, wtforms
 # Logging: python built-in logging for flaskapp and db_update

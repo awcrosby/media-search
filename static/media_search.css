@@ -53,6 +53,10 @@
     cursor:pointer;
 }
 
+h4 {
+    margin-top: 0px!important;
+}
+
 /* prevents bootstrap nav bar from collapsing on smaller screens
    https://stackoverflow.com/questions/23535289/bootstrap-3-disable-navbar-collapse/23536146#23536146 */
 .navbar-collapse.collapse {
