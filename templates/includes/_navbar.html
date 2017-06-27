@@ -15,15 +15,20 @@
     <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
       <a class="navbar-brand" href="/">MediaSearch</a>
       <ul class="nav navbar-nav">
-        <li{% if active_page == 'watchlist' %} class="active"{% endif %}>
+        {% if session.logged_in %}
+          <li{% if active_page == 'watchlist' %} class="active"{% endif %}>
             <a href="/watchlist">Watchlist</a>
-        </li>
+          </li>
+        {% endif %}
       </ul>
 
       <ul class="nav navbar-nav navbar-right">
-        <li><a href="/register">Register</a></li>
-        <li><a href="/login">Log in</a></li>
-        <li><a href="/logout">Log out</a></li>
+        {% if session.logged_in %}
+            <li><a href="/logout">Log out</a></li>
+        {% else %}
+            <li><a href="/register">Register</a></li>
+            <li><a href="/login">Log in</a></li>
+        {% endif %}
       </ul>
     </div><!-- /.navbar-collapse -->
   </div><!-- /.container-fluid -->

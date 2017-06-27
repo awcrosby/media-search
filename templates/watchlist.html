@@ -4,8 +4,12 @@
 {% block body %}
     {% include 'includes/_searchbar.html' %}
 
+    {% if not medias %}<br><h3>Watchlist empty... search and add</h3>{% endif %}
+
     <div class="clearfix" style="margin-bottom: 20px"></div>
-    <table>
+
+    <div class="panel panel-default">
+    <table class="table table-condensed table-striped">
       <tr>
         <th></th>
         <th>Title</th>
@@ -25,9 +29,7 @@
           <td>{{ m['title'] }}</td>
           <td>
             {% for s in m['src_display'] %}
-                {{ s['display_name'] }}
-                <a href={{ s['link'] }}>watch</a>
-                <a href=placeholder.html>signup</a>
+                  <a href={{ s['link'] }}>{{ s['display_name'] }}</a> &nbsp;
             {% endfor %}
           </td>
           <td>
@@ -42,5 +44,6 @@
         </tr>
       {% endfor %}
     </table>
+    </div> <!-- panel div -->
 
 {% endblock %}

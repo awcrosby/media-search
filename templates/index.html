@@ -1,48 +1,45 @@
 {% extends 'layout.html' %}
 
 {% block body %}
-    <div>  <!-- introduction -->
+    <div>
       <h4>Find if a movie/show is streaming on Netflix, HBO, Hulu, Amazon Prime, or Showtime</h4>
     </div>
 
     {% include 'includes/_searchbar.html' %}
 
-    <!-- end-result-ui: a source was found -->
-    {% if media and media['src_display'] %}
-        <!-- box with media image and description -->
-        <div class="clearfix" style="margin-bottom: 20px"></div>
-        <div class="row">
-          <div class="col-md-2">  
-            <img style="margin-right: 2%" src="{{ media['img'] }}" alt="Media result image" />
-          </div>
-          <div class="col-md-10">
-            The {{ mtype }} <strong>{{ media['title'] }} ({{ media['year'] }})</strong>
-            <a href='http://www.imdb.com/title/{{ media['imdb'] }}'>imdb</a>
-            is available on these streaming services:
+    <!-- display media image and info if found -->
+    {% if media %}
+        <div class="clearfix" style="margin-top: 20px">
+          <img style="margin-right: 15px; float: left;" src="{{ media['img'] }}" alt="Media result image" />
+          <strong>{{ media['title'] }} ({{ media['year'] }})</strong>
+          <a href='http://www.imdb.com/title/{{ media['imdb'] }}'>imdb</a>
+          {% if session.logged_in %}
             <form method="POST" action="/edit_watchlist">
               <input type="hidden" name="operation" value="add" />
               <input type="hidden" name="mtype" value="{{ mtype }}" />
               <input type="hidden" name="gbid" value="{{ media['id'] }}" />
-              <button type="submit" class="btn">+</button>
+              <button type="submit" class="btn btn-primary">Add to Watchlist</button>
             </form>
-          </div>
+          {% endif %}
         </div>
+    {% else %}
+        <div class="clearfix" style="margin-top: 20px">
+          Your search for "{{ query }}" did not match any {{ mtype }} results.
+        </div>
+    {% endif %}
 
-        <div class="clearfix" style="margin-bottom: 30px"></div>
-
+    <!-- display sources if found -->
+    {% if media and not media['src_display'] %}
+        <div class="clearfix" style="margin-top: 20px">
+          This {{ mtype }} is not currently available for streaming.
+        </div>
+    {% elif media and media['src_display'] %}
+        <div class="clearfix" style="margin-top: 20px"></div>
         {% for s in media['src_display'] %}
             <!-- display logo or title in source boxes -->
             <div class="source">
-              {% if s['source'] == 'netflix' %}
-                  <img class="logo" src="{{ url_for('static', filename='netflix_logo.png') }}" alt="Netflix logo" />
-              {% elif s['source'] == 'hulu_plus' %}
-                  <img class="logo" src="{{ url_for('static', filename='hulu_logo.png') }}" alt="Hulu logo" />
-              {% elif s['source'] == 'amazon_prime' %}
-                  <img class="logo" src="{{ url_for('static', filename='amz_prime_video.jpg') }}" alt="Amazon Prime logo"  />
-              {% elif s['source'] == 'hbo_now' %}
-                  <img class="logo" src="{{ url_for('static', filename='hbo_logo.png') }}" alt="HBO logo" />
-              {% elif s['source'] == 'showtime_subscription' %}
-                  <img class="logo" src="{{ url_for('static', filename='showtime_logo.png') }}" alt="Showtime logo" />
+              {% if s['source'] in ['netflix', 'hulu_plus', 'amazon_prime', 'hbo_now', 'showtime_subscription'] %}
+                  <img class="logo" src="{{ url_for('static', filename=s['source']+'_logo.png') }}" alt="Subscription logo" />
               {% elif s['type'] == 'subscription_web_sources' %}
                   <div class="typefree">Stream with Subscription</div>
                   <div class="name">{{ s['display_name'] }}</div>
@@ -78,26 +75,12 @@
               {% endif %} -->
             </div>
         {% endfor %}
-
-        <div class="clearfix" style="margin-bottom: 15px"></div>
-
- 
-    {% elif media %}  <!-- end-result-ui: search results without a source -->
-        <p>
-          The {{ mtype }} <strong>{{ media['title'] }} ({{ media['year'] }})</strong>
-          <a href='http://www.imdb.com/title/{{ media['imdb'] }}'>imdb</a>
-          doesn't seem available on these streaming services.
-        </p>
-
-
-    {% elif query %}  <!-- end-result-ui: no search results -->
-        <p>Your search for "{{ query }}" did not match any {{ mtype }} results.</p>
     {% endif %}
 
-
-    {% if other_results %}  <!-- end-result-ui: list other search results -->
-        <div class="clearfix" style="margin-bottom: 2rem">
-          <br>...or did you mean?:
+    <!-- list other search results if found -->
+    {% if other_results %}
+        <div class="clearfix" style="margin-top: 20px">
+          ...or did you mean?:
           {% for item in other_results %}
               <a href="{{ item['link'] }}">{{ item['title'] }}</a> &nbsp;
           {% endfor %}
