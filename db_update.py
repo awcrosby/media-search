@@ -39,7 +39,7 @@ def main():
 
     ''' Section for movies '''
     # get list of new popular movies to add to database
-    mov_limit = 200
+    mov_limit = 1500
     page_len = 100
     mv_pop = guidebox.Movie.list(limit=page_len)  # initial dictionary
     for i in range(1, mov_limit/page_len):  # more pages if needed
@@ -55,7 +55,7 @@ def main():
         db.Movies.insert_one(mov_detail)
         logging.info('movie added: ' + mov_detail['title'])
 
-    # get movie ids with updates / to update
+    '''# get movie ids with updates / to update
     mv_chg = get_updates(obj='movie', typ='changes', time=time_ago)
     mv_chg = [m['id'] for m in mv_chg['results']]
     mv_db = [m['id'] for m in db.Movies.find()]
@@ -66,11 +66,11 @@ def main():
         db.Movies.remove({'id': gbid})
         mov_detail = guidebox.Movie.retrieve(id=gbid)
         db.Movies.insert_one(mov_detail)
-        logging.info('movie updated: ' + mov_detail['title'])
+        logging.info('movie updated: ' + mov_detail['title'])'''
 
     ''' Section for shows '''
-    # get list of new popular movies to add to database
-    show_limit = 200
+    '''# get list of new popular movies to add to database
+    show_limit = 800
     page_len = 100
     sh_pop = guidebox.Show.list(limit=page_len)  # initial dictionary
     for i in range(1, show_limit/page_len):  # more pages if needed
@@ -84,9 +84,9 @@ def main():
     for gbid in sh_new:
         show_ep = get_show_ep(gbid)
         db.Shows.insert_one(show_ep)
-        logging.info('show added: ' + show_ep['title'])
+        logging.info('show added: ' + show_ep['title'])'''
 
-    # get show ids with updates (show changes, changed ep, new ep) / to update
+    '''# get show ids with updates (show changes, changed ep, new ep) / to update
     sh_chgep = get_updates(obj='show', typ='changed_episodes', time=time_ago)
     sh_chgep = [e['id'] for e in sh_chgep['results']]
     sh_newep = get_updates(obj='show', typ='new_episodes', time=time_ago)
@@ -97,19 +97,15 @@ def main():
 
     # update episode portion of show_episode dictionary
     for gbid in sh_to_update:
+        # get full show+episode dict from database
         show_ep_db = db.Shows.find_one({'id': gbid})
+
+        # get all episodes from api
         episodes = get_all_ep(gbid)
 
-        # add show info to the episodes
-        episodes['id'] = gbid
-        episodes['imdb_id'] = show_ep_db['imdb_id']
-        episodes['title'] = show_ep_db['title']
-        episodes['year'] = show_ep_db['year']
-        episodes['img'] = show_ep_db['img']
-
-        # update the show_episode dict in the database
+        # updates db show_ep dict with episodes, other keys maintained
         db.Shows.update_one({'id': gbid}, {'$set': episodes})
-        logging.info('show updated: ' + show_ep_db['title'])
+        logging.info('show updated: ' + show_ep_db['title'])'''
 
     # log database counts
     logging.info('movies added: ' + str(len(mv_new)))

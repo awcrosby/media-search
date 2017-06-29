@@ -132,15 +132,19 @@ def get_show_ep(gbid):
 
     # get high-level show info, get episodes for show
     show = guidebox.Show.retrieve(id=gbid)
-    show_ep = get_all_ep(gbid)
+    all_ep = get_all_ep(gbid)
 
-    # add high-level show info to dict with all episodes
-    show_ep['id'] = gbid  # add a key to dictionary to allow lookup
-    show_ep['imdb_id'] = show['imdb_id']
-    show_ep['title'] = show['title']
-    show_ep['year'] = show['first_aired'][:4]
-    show_ep['img'] = show['artwork_208x117']
-    show_ep['overview'] = show['overview']
+    # combine high-level show info with all episodes
+    show_ep = all_ep.copy()
+    show_ep.update(show)
+
+    # normalize fields to match movie data fields
+    try:
+        show_ep['img'] = show_ep['artwork_208x117']
+        show_ep['year'] = show_ep['first_aired'][:4]
+        show_ep['imdb'] = show_ep['imdb_id']
+    except Exception as e:
+        logging.exception('api missing field when setting show data')
 
     return show_ep
 

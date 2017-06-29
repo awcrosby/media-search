@@ -8,6 +8,7 @@ import pymongo
 import pprint
 import logging
 import datetime
+import requests
 from wtforms import Form, StringField, PasswordField, validators
 from passlib.hash import sha256_crypt
 from shared_func import get_media, add_src_display
@@ -209,8 +210,31 @@ def search(mtype='movie', query=''):
     query = query.strip()
 
     guidebox.api_key = json.loads(open('apikeys.json').read())['guidebox']
+    tmdb_url = 'https://api.themoviedb.org/3/search/'
+    params = {
+        'api_key': json.loads(open('apikeys.json').read())['tmdb'],
+        'query': query
+    }
 
     if mtype == 'all':
+        # high-level search of movie and show, filtering out less popular
+        mv = requests.get(tmdb_url+'movie', params=params).json()
+        mv['results'] = [m for m in mv['results'] if m['vote_count'] >= 100 or 
+                                                     m['popularity'] > 10]
+        sh = requests.get(tmdb_url+'tv', params=params).json()
+        sh['results'] = [m for m in sh['results'] if m['vote_count'] >= 100 or
+                                                     m['popularity'] > 10]
+
+        # if neither have results
+        if (len(mv['results']) + len(sh['results']) == 0):
+            return render_template('search.html', isresult=0,
+                                   query=query, mtype='media')
+
+        # display movie/show results on intermediate page (no sources)
+        else:
+            return render_template('mixedresults.html', shows=sh, movies=mv,
+                                   query=query)
+
         # search both movie and show, first get high-level results
         mv = guidebox.Search.movies(field='title', query=query)
         sh = guidebox.Search.shows(field='title', query=query)
@@ -234,6 +258,10 @@ def search(mtype='movie', query=''):
                                    query=query)
 
     if mtype == 'movie':
+        # query themoviedb
+        response = requests.get(tmdb_url+'movie', params=params).json()
+        print 'title from tmdb=', response['results'][0]['title']
+
         # get movie query results, take top result
         results = guidebox.Search.movies(field='title', query=query)
         if not (results['total_results'] > 0):  # exit early if no results
@@ -242,6 +270,9 @@ def search(mtype='movie', query=''):
         gbid = results['results'][0]['id']  # take first result
 
     elif mtype == 'show':
+        # query themoviedb
+        response = requests.get(tmdb_url+'tv', params=params).json()
+
         # get show query results, and take top result
         results = guidebox.Search.shows(field='title', query=query)
         if not (results['total_results'] > 0):  # exit early if no results
@@ -257,11 +288,15 @@ def search(mtype='movie', query=''):
 
     # build other_results to send to template, if query was performed
     other_results = []
-    for m in results['results'][1:5]:
+    for m in response['results']:
+        if m['vote_count'] >= 100:
+            x = {'link': '#', 'title': m['title']}
+            other_results.append(x)
+    '''for m in results['results'][1:5]:
         x = {'link': url_for('lookup', mtype=mtype, gbid=str(m['id'])),
              'title': m['title']}
         # if (m['wikipedia_id'] != 0) and (m['wikipedia_id'] is not None):
-        other_results.append(x)  # only keep if not very obscure
+        other_results.append(x)  # only keep if not very obscure'''
 
     # logs dictionaries retrieved, either from db or api
     logging.info('user query: ' + query)
