@@ -1,9 +1,7 @@
 {% extends 'layout.html' %}
 
 {% block body %}
-    <div>
-      <h4>Find if a movie/show is streaming on Netflix, HBO, Hulu, Amazon Prime, or Showtime</h4>
-    </div>
+    <h4>Find if a movie/show is streaming on Netflix, HBO, Hulu, Amazon Prime, or Showtime</h4>
 
     {% include 'includes/_searchbar.html' %}
 
@@ -14,8 +12,8 @@
       {% for mv in movies['results'][:3] %}
           <div class="col-md-2">
             <div>Movie:</div>
-            <a href="#">
-              <img src={{ img_base_url + mv['poster_path'] }}>
+            <a href="{{ url_for('lookup', mtype='movie', tmdbid=mv['id']) }}">
+              <img src="{{ img_base_url + mv['poster_path'] }}">
               <div>{{ mv['title'] }} ({{ mv['release_date'][:4] }})</div>
             </a>
           </div>
@@ -24,8 +22,8 @@
       {% for sh in shows['results'][:3] %}
           <div class="col-md-2">
             <div>Show:</div>
-            <a href="#">
-              <img src={{ img_base_url + sh['poster_path'] }}>
+            <a href="{{ url_for('lookup', mtype='show', tmdbid=sh['id']) }}">
+              <img src="{{ img_base_url + sh['poster_path'] }}">
               <div>{{ sh['name'] }} ({{ sh['first_air_date'][:4] }})</div>
             </a>
           </div>

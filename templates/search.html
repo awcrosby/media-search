@@ -1,38 +1,43 @@
 {% extends 'layout.html' %}
 
 {% block body %}
-    <div>
-      <h4>Find if a movie/show is streaming on Netflix, HBO, Hulu, Amazon Prime, or Showtime</h4>
-    </div>
+    <h4>Find if a movie/show is streaming on Netflix, HBO, Hulu, Amazon Prime, or Showtime</h4>
 
     {% include 'includes/_searchbar.html' %}
 
-    <!-- display media image and info if found -->
-    {% if media %}
-        <div class="clearfix" style="margin-top: 20px">
-          <img style="margin-right: 15px; float: left;" src="{{ media['img'] }}" alt="Media result image" />
-          <strong>{{ media['title'] }} ({{ media['year'] }})</strong>
-          <a href='http://www.imdb.com/title/{{ media['imdb'] }}'>imdb</a>
-          {{ media['overview'] }}
-          {% if session.logged_in %}
-            <form method="POST" action="/edit_watchlist">
-              <input type="hidden" name="operation" value="add" />
-              <input type="hidden" name="mtype" value="{{ mtype }}" />
-              <input type="hidden" name="gbid" value="{{ media['id'] }}" />
-              <button type="submit" class="btn btn-primary">Add to Watchlist</button>
-            </form>
-          {% endif %}
-        </div>
-    {% else %}
-        <div class="clearfix" style="margin-top: 20px">
-          Your search for "{{ query }}" did not match any {{ mtype }} results.
-        </div>
-    {% endif %}
+    {% set img_base_url = 'https://image.tmdb.org/t/p/w154' %}
+
+    <!-- display summary media info from themoviedb api call, not from db-->
+    <div class="clearfix" style="margin-top: 20px">
+        {% if summary %}
+            <img style="margin-right: 15px; float: left; width: 120px;" src="{{ img_base_url + summary['poster_path'] }}" alt="Media result image" />
+            {% if mtype == 'movie' %}
+                <strong>{{ summary['title'] }} ({{ summary['release_date'][:4] }})</strong>
+            {% else %}
+                <strong>{{ summary['name'] }} ({{ summary['first_air_date'][:4] }})</strong>
+            {% endif %}
+            - {{ summary['overview'] }}
+            {% if session.logged_in %}
+              <form method="POST" action="/edit_watchlist">
+                <input type="hidden" name="operation" value="add" />
+                <input type="hidden" name="mtype" value="{{ mtype }}" />
+                <input type="hidden" name="gbid" value="{{ media['themoviedb'] }}" />
+                <button type="submit" class="btn btn-primary">Add to Watchlist</button>
+              </form>
+            {% endif %}
+        {% else %}
+            Your search for "{{ query }}" did not match any {{ mtype }} results.
+        {% endif %}
+    </div>
 
     <!-- display sources if found -->
     {% if media and not media['src_display'] %}
         <div class="clearfix" style="margin-top: 20px; color: red">
-          This {{ mtype }} is not currently available for streaming.
+          {% if media['_id'] %}  <!-- media came from the database -->
+              There are no streaming sources for this {{ mtype }}
+          {% else %}
+              We do not have infomation about this {{ mtype }}
+          {% endif %}
         </div>
     {% elif media and media['src_display'] %}
         <div class="clearfix" style="margin-top: 20px"></div>

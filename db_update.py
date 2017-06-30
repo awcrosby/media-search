@@ -18,7 +18,8 @@ def main():
     db = client.MediaData
     guidebox.api_key = json.loads(open('/home/awcrosby/media-search/'
                                   'apikeys.json').read())['guidebox']
-    time_ago = int(time.time() - 612000)  # week and 2hr ago
+    #time_ago = int(time.time() - 612000)  # week and 2hr ago
+    time_ago = int(time.time() - 3600)
     logging.basicConfig(filename='/home/awcrosby/media-search/'
                         'log/db_update.log',
                         format='%(asctime)s %(levelname)s: %(message)s',
@@ -39,7 +40,7 @@ def main():
 
     ''' Section for movies '''
     # get list of new popular movies to add to database
-    mov_limit = 1500
+    mov_limit = 2500
     page_len = 100
     mv_pop = guidebox.Movie.list(limit=page_len)  # initial dictionary
     for i in range(1, mov_limit/page_len):  # more pages if needed
@@ -70,7 +71,7 @@ def main():
 
     ''' Section for shows '''
     '''# get list of new popular movies to add to database
-    show_limit = 800
+    show_limit = 1000
     page_len = 100
     sh_pop = guidebox.Show.list(limit=page_len)  # initial dictionary
     for i in range(1, show_limit/page_len):  # more pages if needed
