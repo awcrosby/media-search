@@ -1,7 +1,6 @@
-This is a demo project that searches movies and tv shows via themoviedb api,
-and displays streaming sources based on cached data. Data is rich but outdated,
-therefore for demonstation purposes only. Also supports creating an account
-for a personalized watchlist.
+This project searches movies and tv shows via themoviedb api, then it
+displays streaming sources if found. This also supports creating an
+account for a personalized watchlist.
 
 # -----System Pieces-----
 # Hosting: Digital Ocean, ubuntu

@@ -25,13 +25,11 @@
                 <button type="submit" class="btn btn-primary">Add to Watchlist</button>
               </form>
             {% endif %}
-        {% else %}
-            Your search for "{{ query }}" did not match any {{ mtype }} results.
         {% endif %}
     </div>
 
     <!-- display sources if found -->
-    {% if media and not media['src_display'] %}
+    {% if not media or not media['src_display'] %}
         <div class="clearfix" style="margin-top: 20px; color: red">
           {% if media['_id'] %}  <!-- media came from the database -->
               There are no streaming sources for this {{ mtype }}
@@ -83,14 +81,4 @@
         {% endfor %}
     {% endif %}
 
-    <!-- list other search results if found -->
-    {% if other_results %}
-        <div class="clearfix" style="margin-top: 20px">
-          ...or did you mean?:
-          {% for item in other_results %}
-              <a href="{{ item['link'] }}">{{ item['title'] }}</a> &nbsp;
-          {% endfor %}
-        </div>
-    {% endif %}
-    
 {% endblock %}

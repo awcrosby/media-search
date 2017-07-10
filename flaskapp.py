@@ -1,8 +1,9 @@
 #!/usr/bin/env python
 from flask import (Flask, render_template, request, redirect,
-                   url_for, flash, session)
+                   url_for, flash, session, abort)
+from flask_restful import Resource, Api
+from bson.json_util import dumps
 import json
-import guidebox
 import time
 import pymongo
 import pprint
@@ -14,18 +15,21 @@ from passlib.hash import sha256_crypt
 from shared_func import get_media, add_src_display
 from functools import wraps
 app = Flask(__name__)
+api = Api(app)
 
 '''webframework flaskapp high-level functionality:
-    resolve user search query to a specific media
-    search for media details in database otherwise request from guidebox api
+    user search query via themoviedb api, results with links to specific media
+    lookup movie info from database
     display streaming sources by type, with links and show ep info
-    list 'did you mean' links if more than one query result was found'''
+    support user login to create and edit a watchlist'''
 
 logging.basicConfig(filename='/home/awcrosby/media-search/'
                     'log/flaskapp.log',
                     format='%(asctime)s %(levelname)s: %(message)s',
                     level=logging.INFO)
 
+
+app.secret_key = '3d6gtrje6d2rffe2jqkv'
 
 # landing page
 @app.route('/')
@@ -198,101 +202,74 @@ def watchlist():
     return render_template('watchlist.html', medias=watchlist, mtype=mtype)
 
 
-# process media search
+# send user query to themoviedb api and return json
 @app.route('/search', methods=['GET'])
 def search(mtype='movie', query=''):
+    # ensure GET data is valid
     query = request.args.get('q')  # can be string or NoneType
     mtype = request.args.get('mtype')
     session['dropdown'] = mtype
-
     if not query or (mtype not in ['movie', 'show', 'all']):
         return render_template('home.html')
     query = query.strip()
 
-    guidebox.api_key = json.loads(open('apikeys.json').read())['guidebox']
+    # setup api interaction and log query
     tmdb_url = 'https://api.themoviedb.org/3/search/'
     params = {
         'api_key': json.loads(open('apikeys.json').read())['tmdb'],
         'query': query
     }
+    logging.info('user query: ' + query + mtype)
+    print 'user query:', query, mtype
 
-    # if user searches all, check only themoviedb for search and
-    # pymongo db for sources, do not go to guidebox api
-    if mtype == 'all':
-        # high-level search of movie and show, filtering out less popular
+    # perform search with themoviedb api
+    mv, sh, mv['results'], sh['results'] = ({}, {}, {}, {})
+    if mtype == 'movie' or mtype == 'all':
         mv = requests.get(tmdb_url+'movie', params=params).json()
-        mv['results'] = [m for m in mv['results'] if m['vote_count'] >= 20 or 
+        mv['results'] = [m for m in mv['results'] if m['vote_count'] >= 20 or
                                                      m['popularity'] > 10]
+    if mtype == 'show' or mtype == 'all':
         sh = requests.get(tmdb_url+'tv', params=params).json()
         sh['results'] = [m for m in sh['results'] if m['vote_count'] >= 20 or
                                                      m['popularity'] > 10]
 
-        # if neither have results render template without sending media
-        if (len(mv['results']) + len(sh['results']) == 0):
-            return render_template('search.html', query=query, mtype='media')
+    # if neither have results render template without sending media
+    if (len(mv['results']) + len(sh['results']) == 0):
+        return render_template('searchresults.html', query=query)
 
-        # if just one has results, redirect to media (does not retain query)
-        elif len(mv['results']) == 0:
-            return redirect(url_for('lookup', mtype='show',
-                                    tmdbid=str(sh['results'][0]['id'])))
-        elif len(sh['results']) == 0:
-            return redirect(url_for('lookup', mtype='movie',
-                                    tmdbid=str(mv['results'][0]['id'])))
+    # if just one has results, go directly to media info page
+    elif len(mv['results']) == 0:
+        return redirect(url_for('mediainfo', mtype='show',
+                                tmdbid=sh['results'][0]['id']))
+    elif len(sh['results']) == 0:
+        return redirect(url_for('mediainfo', mtype='movie',
+                                tmdbid=mv['results'][0]['id']))
 
-        # display multiple results (without sources) for user to choose
+    # display multiple results (without sources) for user to choose
+    else:
+        return render_template('searchresults.html', shows=sh, movies=mv,
+                               query=query)
+
+
+# gets media info from database, local api
+class Media(Resource):
+    def get(self, media_type, media_id):
+        client = pymongo.MongoClient('localhost', 27017)
+        db = client.MediaData
+        if media_type == 'movie':
+            media = db.Movies.find_one({'themoviedb': media_id})
         else:
-            return render_template('mixedresults.html', shows=sh, movies=mv,
-                                   query=query)
+            media = db.Shows.find_one({'themoviedb': media_id})
+        if not media:
+            abort(400)
+        return dumps(media)  #explicit pymongo BSON conversion to json
+            
+# set up api resource routing
+api.add_resource(Media, '/apiv1.0/<media_type>/<int:media_id>')
 
-    # if user chooses to search just movie/show check both apis
-    # and if not in database go get source data from guidebox api
-    elif mtype == 'movie':
-        tmdb_res = requests.get(tmdb_url+'movie', params=params).json()
-        gb_res = guidebox.Search.movies(field='title', query=query)
-    elif mtype == 'show':
-        tmdb_res = requests.get(tmdb_url+'tv', params=params).json()
-        gb_res = guidebox.Search.shows(field='title', query=query)
-
-    # exit early if no results
-    if tmdb_res['total_results'] == 0 or gb_res['total_results'] == 0:
-        return render_template('search.html', query=query, mtype=mtype)
-
-    # get the id variables from top search result
-    tmdbid = tmdb_res['results'][0]['id']
-    gbid = gb_res['results'][0]['id']
-
-    # get media details from mongodb, or api search + add to mongodb
-    media = get_media(gbid, mtype, tmdbid)
-
-    # add display sources to the movie or show_ep dict
-    media = add_src_display(media, mtype)
-
-    # build other_results to send to template, if query was performed
-    other_results = []
-    for m in tmdb_res['results'][1:]:
-        if m['vote_count'] >= 20 or m['popularity'] > 10:
-            link = url_for('lookup', mtype=mtype, tmdbid=str(m['id']))
-            if mtype == 'movie': x = {'link': link, 'title': m['title']}
-            else: x = {'link': link, 'title': m['name']}
-            other_results.append(x)
-
-    # logs dictionaries retrieved, either from db or api
-    logging.info('user query: ' + query)
-    print 'user query:', query
-    logResults = open('log/search_results.log', 'w')
-    pprint.pprint([tmdb_res, gb_res], logResults)
-    logResults.close()
-    logMedia = open('log/media_detail.log', 'w')
-    pprint.pprint(media, logMedia)
-    logMedia.close()
-
-    return render_template('search.html', media=media, query=query,
-                           mtype=mtype, other_results=other_results)
-
-
-# process media id lookup
+# lookup via media id for mediainfo.html
 @app.route('/<mtype>/id/<int:tmdbid>', methods=['GET'])
-def lookup(mtype='movie', tmdbid=None):
+def mediainfo(mtype='movie', tmdbid=None):
     mtype = 'movie' if mtype != 'show' else 'show'
 
     # get summary info from themoviedb api
@@ -301,29 +278,23 @@ def lookup(mtype='movie', tmdbid=None):
     else:
         tmdb_url = 'https://api.themoviedb.org/3/tv/'
     params = {'api_key': json.loads(open('apikeys.json').read())['tmdb']}
-    summary = requests.get(tmdb_url + str(tmdbid), params=params).json()
+    summary = requests.get(tmdb_url + str(tmdbid), params=params)
 
-    # database lookup via tmdbid
-    client = pymongo.MongoClient('localhost', 27017)
-    db = client.MediaData
-    if mtype == 'movie':
-        media = db.Movies.find_one({'themoviedb': tmdbid})
-    else:
-        media = db.Shows.find_one({'themoviedb': tmdbid})
+    # local api request
+    media = requests.get(api.url_for(Media, media_type=mtype,
+                                     media_id=tmdbid, _external=True))
 
-    '''# if not in database, get basic details from api and display not found
-    if not media:
-        tmdb_url = 'https://api.themoviedb.org/3/movie/'
-        params = {'api_key': json.loads(open('apikeys.json').read())['tmdb']}
-        media = requests.get(tmdb_url + str(tmdbid), params=params).json()
-        return render_template('search.html', media=media, mtype=mtype)'''
-
-    # add display sources to the movie or show_ep dict
+    # add display sources
     if media:
+        media = json.loads(media.json())
         media = add_src_display(media, mtype)
 
-    return render_template('search.html', media=media, query='',
-                           mtype=mtype, other_results=[], summary=summary)
+    if summary.status_code != 200:
+        flash('Media id not found', 'danger')
+        return redirect(url_for('home'))
+
+    return render_template('mediainfo.html', media=media,
+                           mtype=mtype, summary=summary.json())
 
 
 if __name__ == "__main__":
