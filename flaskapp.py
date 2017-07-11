@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 from flask import (Flask, render_template, request, redirect,
                    url_for, flash, session, abort)
-from flask_restful import Resource, Api
+from flask_restful import Resource, Api, reqparse
 from bson.json_util import dumps
 import json
 import time
@@ -27,14 +27,20 @@ logging.basicConfig(filename='/home/awcrosby/media-search/'
                     'log/flaskapp.log',
                     format='%(asctime)s %(levelname)s: %(message)s',
                     level=logging.INFO)
-
-
 app.secret_key = '3d6gtrje6d2rffe2jqkv'
+parser = reqparse.RequestParser()
 
-# landing page
-@app.route('/')
-def home():
-    return render_template('home.html')
+
+# check if users logged in
+def is_logged_in(f):
+    @wraps(f)
+    def wrap(*args, **kwargs):
+        if 'logged_in' in session:
+            return f(*args, **kwargs)
+        else:
+            flash('Unauthorized, please login', 'danger')
+            return redirect(url_for('login'))
+    return wrap
 
 
 class RegisterForm(Form):
@@ -45,6 +51,12 @@ class RegisterForm(Form):
         validators.EqualTo('confirm', message='Passwords do not match')
     ])
     confirm = PasswordField('Confirm Password')
+
+
+# landing page
+@app.route('/')
+def home():
+    return render_template('home.html')
 
 
 # user registration
@@ -66,8 +78,7 @@ def register():
                 'email': email,
                 'password': password,
                 'dateCreated': datetime.datetime.utcnow(),
-                'movieq': [],
-                'showq': []
+                'watchlist': []
             })
         except pymongo.errors.DuplicateKeyError:
             flash('That email is already registered', 'danger')
@@ -106,18 +117,6 @@ def login():
     return render_template('login.html')
 
 
-# check if users logged in
-def is_logged_in(f):
-    @wraps(f)
-    def wrap(*args, **kwargs):
-        if 'logged_in' in session:
-            return f(*args, **kwargs)
-        else:
-            flash('Unauthorized, please login', 'danger')
-            return redirect(url_for('login'))
-    return wrap
-
-
 # user logout
 @app.route('/logout', methods=['GET'])
 def logout():
@@ -126,47 +125,74 @@ def logout():
     return redirect(url_for('login'))
 
 
-# add or delete item from watchlist is processed here, no UI
-@app.route('/edit_watchlist', methods=['GET', 'POST'])
-@is_logged_in
-def edit_watchlist():
-    if request.method == 'POST':
-        # connect to db, get user, get form data
-        client = pymongo.MongoClient('localhost', 27017)
-        db = client.MediaData
+# local api media interaction
+class Media(Resource):
+    def get(self, mtype, mid):
+        db = pymongo.MongoClient('localhost', 27017).MediaData
+        if mtype == 'movie':
+            media = db.Movies.find_one({'themoviedb': mid})
+        else:
+            media = db.Shows.find_one({'themoviedb': mid})
+        if not media:
+            abort(400)
+        return dumps(media)  # pymongo BSON conversion to json
+
+
+# local api, watchlist, GET all or POST one
+class Wlist(Resource):
+    def get(self):
+        db = pymongo.MongoClient('localhost', 27017).MediaData
         email = session['email']
-        operation = request.form['operation']
+        user = db.Users.find_one({'email': email})
+        return user['watchlist']
+    def post(self):
+        # setup db and received arguments
+        db = pymongo.MongoClient('localhost', 27017).MediaData
+        mid = int(request.form['mid'])
         mtype = request.form['mtype']
-        gbid = int(request.form['gbid'])
+        title = request.form['title']
+        year = request.form['year']
 
-        # update the queue for movie or show
-        if operation == 'add' and mtype == 'movie':
-            user = db.Users.find_one({'email': email})
-            if gbid not in user['movieq']:
-                db.Users.find_one_and_update({'email': email},
-                                             {'$push': {'movieq': gbid}})
-                flash('Movie added to watchlist', 'success')
-            else:
-                flash('Movie already in watchlist', 'danger')
-        elif operation == 'add' and mtype == 'show':
-            user = db.Users.find_one({'email': email})
-            if gbid not in user['showq']:
-                db.Users.find_one_and_update({'email': email},
-                                             {'$push': {'showq': gbid}})
-                flash('Show added to watchlist', 'success')
-            else:
-                flash('Show already in watchlist', 'danger')
-        elif operation == 'delete' and mtype == 'movie':
-            db.Users.find_one_and_update({'email': email},
-                                         {'$pull': {'movieq': gbid}})
-            flash('Movie deleted from watchlist', 'success')
-        elif operation == 'delete' and mtype == 'show':
-            db.Users.find_one_and_update({'email': email},
-                                         {'$pull': {'showq': gbid}})
-            flash('Show deleted from watchlist', 'success')
-        client.close()
-    return redirect(url_for('watchlist', mtype=mtype))
+        # check if media already in watchlist
+        # TODO if not show add button when already added, can remove this check
+        # and the flash messages below, keeping api and app func seperate
+        user = db.Users.find_one({'email': session['email']})
+        all_mids = [w['id'] for w in user['watchlist'] if w['mtype'] == mtype]
 
+        # add to user's watchlist and redirect to /watchlist
+        if mid not in all_mids:
+            db.Users.find_one_and_update({'email': session['email']},
+              {'$push': {'watchlist':
+                {'mtype': mtype, 'id': mid, 'title': title, 'year': year}}})
+            flash('Item added to watchlist', 'success')
+            return redirect(url_for('watchlist'))
+        else:
+            flash('Item already in watchlist', 'danger')
+            return redirect(url_for('watchlist'))
+
+
+# local api, watchlist, DELETE one   TODO add auth here, email passed
+class WlistItem(Resource):
+    def delete(self, mtype, mid, email):
+        db = pymongo.MongoClient('localhost', 27017).MediaData
+        db.Users.find_one_and_update({'email': email},
+            {'$pull': {'watchlist': {'mtype': mtype, 'id': mid}}})
+        return None  # TODO add status returned so other func can flash
+
+# set up api resource routing
+api.add_resource(Media, '/apiv1.0/<mtype>/<int:mid>')
+api.add_resource(Wlist, '/apiv1.0/watchlist')
+api.add_resource(WlistItem, '/apiv1.0/watchlist/<mtype>/<int:mid>/<email>')
+
+
+# route to allow python to make HTTP DELETE request
+@app.route('/delete/<mtype>/<int:mid>')
+@is_logged_in
+def delFromWatchlist(mtype='movie', mid=None):
+    media = requests.delete(api.url_for(WlistItem, mtype=mtype,
+                mid=mid, _external=True, email=session['email']))
+    return redirect(url_for('watchlist'))
+    
 
 # display user's watchlist
 @app.route('/watchlist')
@@ -176,30 +202,23 @@ def watchlist():
 
     # connect to db and get user
     start = time.time()
-    client = pymongo.MongoClient('localhost', 27017)
-    db = client.MediaData
-    email = session['email']
-    user = db.Users.find_one({'email': email})
+    db = pymongo.MongoClient('localhost', 27017).MediaData
+    user = db.Users.find_one({'email': session['email']})
 
-    # get user watchlist ids
-    mv_ids = user['movieq']
-    sh_ids = user['showq']
+    wl_detail = []
+    for item in user['watchlist']:
+        m = requests.get(api.url_for(Media, mtype=item['mtype'],
+                                     mid=int(item['id']), _external=True))
+        if m:
+            m = json.loads(m.json())
+            m = add_src_display(m, item['mtype'])
+            m['mtype'] = item['mtype']
+            wl_detail.append(m)
+        else:
+            print 'no media found for:', item['title']  # TODO make display but show no sources
 
-    # build watchlist to pass to template
-    watchlist = []
-    for id in mv_ids:
-        m = get_media(id, 'movie', id)
-        m = add_src_display(m, 'movie')
-        watchlist.append(m)
-    for id in sh_ids:
-        m = get_media(id, 'show', id)
-        m = add_src_display(m, 'show')
-        watchlist.append(m)
-
-    client.close()
     print 'time to get media of full watchlist: ', time.time() - start
-    print 'session.email=', email
-    return render_template('watchlist.html', medias=watchlist, mtype=mtype)
+    return render_template('watchlist.html', medias=wl_detail, mtype=mtype)
 
 
 # send user query to themoviedb api and return json
@@ -226,12 +245,12 @@ def search(mtype='movie', query=''):
     mv, sh, mv['results'], sh['results'] = ({}, {}, {}, {})
     if mtype == 'movie' or mtype == 'all':
         mv = requests.get(tmdb_url+'movie', params=params).json()
-        mv['results'] = [m for m in mv['results'] if m['vote_count'] >= 20 or
-                                                     m['popularity'] > 10]
+        mv['results'] = [m for m in mv['results']
+                         if m['vote_count'] >= 20 or m['popularity'] > 10]
     if mtype == 'show' or mtype == 'all':
         sh = requests.get(tmdb_url+'tv', params=params).json()
-        sh['results'] = [m for m in sh['results'] if m['vote_count'] >= 20 or
-                                                     m['popularity'] > 10]
+        sh['results'] = [m for m in sh['results']
+                         if m['vote_count'] >= 20 or m['popularity'] > 10]
 
     # if neither have results render template without sending media
     if (len(mv['results']) + len(sh['results']) == 0):
@@ -251,50 +270,40 @@ def search(mtype='movie', query=''):
                                query=query)
 
 
-# gets media info from database, local api
-class Media(Resource):
-    def get(self, media_type, media_id):
-        client = pymongo.MongoClient('localhost', 27017)
-        db = client.MediaData
-        if media_type == 'movie':
-            media = db.Movies.find_one({'themoviedb': media_id})
-        else:
-            media = db.Shows.find_one({'themoviedb': media_id})
-        if not media:
-            abort(400)
-        return dumps(media)  #explicit pymongo BSON conversion to json
-            
-# set up api resource routing
-api.add_resource(Media, '/apiv1.0/<media_type>/<int:media_id>')
-
 # lookup via media id for mediainfo.html
 @app.route('/<mtype>/id/<int:tmdbid>', methods=['GET'])
 def mediainfo(mtype='movie', tmdbid=None):
     mtype = 'movie' if mtype != 'show' else 'show'
 
     # get summary info from themoviedb api
+    params = {'api_key': json.loads(open('apikeys.json').read())['tmdb']}
     if mtype == 'movie':
         tmdb_url = 'https://api.themoviedb.org/3/movie/'
+        summary = requests.get(tmdb_url + str(tmdbid), params=params)
+        summary = summary.json()
+        summary['year'] = summary['release_date'][:4]
     else:
         tmdb_url = 'https://api.themoviedb.org/3/tv/'
-    params = {'api_key': json.loads(open('apikeys.json').read())['tmdb']}
-    summary = requests.get(tmdb_url + str(tmdbid), params=params)
+        summary = requests.get(tmdb_url + str(tmdbid), params=params)
+        summary = summary.json()
+        summary['title'] = summary['name']
+        summary['year'] = summary['first_air_date'][:4]
 
     # local api request
-    media = requests.get(api.url_for(Media, media_type=mtype,
-                                     media_id=tmdbid, _external=True))
+    media = requests.get(api.url_for(Media, mtype=mtype,
+                                     mid=tmdbid, _external=True))
 
     # add display sources
     if media:
         media = json.loads(media.json())
         media = add_src_display(media, mtype)
 
-    if summary.status_code != 200:
-        flash('Media id not found', 'danger')
-        return redirect(url_for('home'))
+    #if summary.status_code != 200: TODO break up above if/else into another if/else
+    #    flash('Media id not found', 'danger')
+    #    return redirect(url_for('home'))
 
     return render_template('mediainfo.html', media=media,
-                           mtype=mtype, summary=summary.json())
+                           mtype=mtype, summary=summary)
 
 
 if __name__ == "__main__":

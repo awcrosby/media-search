@@ -12,7 +12,7 @@ def get_media(gbid, mtype, tmdbid=None):
     # prepare for database and api access
     client = pymongo.MongoClient('localhost', 27017)
     db = client.MediaData
-    guidebox.api_key = json.loads(open('apikeys.json').read())['guidebox']
+    #guidebox.api_key = json.loads(open('apikeys.json').read())['guidebox']
     start = time.time()
 
     # check db for media based tmdb query, otherwise do guidebox api lookup
@@ -20,24 +20,24 @@ def get_media(gbid, mtype, tmdbid=None):
         media = db.Movies.find_one({'themoviedb': tmdbid})
         if not media:  # not found via tmdbid search
             print '**** tmdbid did not find a result'
-            media = db.Movies.find_one({'id': gbid})
+            '''media = db.Movies.find_one({'id': gbid})
             if not media:  # not found via gbid search, so retrieve and add
                 media = guidebox.Movie.retrieve(id=gbid)
                 db.Movies.insert_one(media.copy())  # copy keeps JSON serializeable
                 logging.info('movie added: ' + media['title'])
         logging.info('movie db/api request time: ' + str(time.time() - start))
-        print 'movie db/api request time: ', time.time() - start
+        print 'movie db/api request time: ', time.time() - start'''
     elif tmdbid and mtype == 'show':
         media = db.Shows.find_one({'themoviedb': tmdbid})
         if not media:  # not found via tmdbid search
             print '**** tmdbid did not find a result'
-            media = db.Shows.find_one({'id': gbid})
+            '''media = db.Shows.find_one({'id': gbid})
             if not media:  # not found via gbid search, so retrieve and add
                 media = get_show_ep(gbid)
                 db.Shows.insert_one(media.copy())  # copy keeps JSON serializeable
                 logging.info('show added: ' + media['title'])
         logging.info('show db/api request time: ' + str(time.time() - start))
-        print 'show db/api request time:', time.time() - start, 'gbid:', gbid
+        print 'show db/api request time:', time.time() - start, 'gbid:', gbid'''
 
     '''# get media details from mongodb, or api search + add to mongodb
     elif mtype == 'movie':
