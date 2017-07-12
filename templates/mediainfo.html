@@ -14,7 +14,7 @@
             <strong>{{ summary['title'] }} ({{ summary['year'] }})</strong>
             - {{ summary['overview'] }}
             {% if session.logged_in %}
-              <form method="POST" action="/apiv1.0/watchlist">
+              <form method="POST" action="/watchlist">
                 <input type="hidden" name="mid" value="{{ summary['id'] }}" />
                 <input type="hidden" name="mtype" value="{{ mtype }}" />
                 <input type="hidden" name="title" value="{{ summary['title'] }}" />

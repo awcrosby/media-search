@@ -134,8 +134,8 @@ class Media(Resource):
         else:
             media = db.Shows.find_one({'themoviedb': mid})
         if not media:
-            abort(400)
-        return dumps(media)  # pymongo BSON conversion to json
+            return '', 404
+        return dumps(media), 200  # pymongo BSON conversion to json
 
 
 # local api, watchlist, GET all or POST one
@@ -146,58 +146,68 @@ class Wlist(Resource):
         user = db.Users.find_one({'email': email})
         return user['watchlist']
     def post(self):
-        # setup db and received arguments
         db = pymongo.MongoClient('localhost', 27017).MediaData
-        mid = int(request.form['mid'])
-        mtype = request.form['mtype']
-        title = request.form['title']
-        year = request.form['year']
 
-        # check if media already in watchlist
-        # TODO if not show add button when already added, can remove this check
-        # and the flash messages below, keeping api and app func seperate
-        user = db.Users.find_one({'email': session['email']})
-        all_mids = [w['id'] for w in user['watchlist'] if w['mtype'] == mtype]
+        # check if media already in watchlist and if so exit
+        user = db.Users.find_one({'email': request.form['email']})
+        all_mids = [w['id'] for w in user['watchlist']
+                   if w['mtype'] == request.form['mtype']]
+        if int(request.form['mid']) in all_mids:
+            return '', 404
 
-        # add to user's watchlist and redirect to /watchlist
-        if mid not in all_mids:
-            db.Users.find_one_and_update({'email': session['email']},
-              {'$push': {'watchlist':
-                {'mtype': mtype, 'id': mid, 'title': title, 'year': year}}})
-            flash('Item added to watchlist', 'success')
-            return redirect(url_for('watchlist'))
-        else:
-            flash('Item already in watchlist', 'danger')
-            return redirect(url_for('watchlist'))
+        # add to user's watchlist
+        db.Users.find_one_and_update({'email': request.form['email']},
+          {'$push': {'watchlist':
+            {'id': int(request.form['mid']), 'mtype': request.form['mtype'],
+             'title': request.form['title'], 'year': request.form['year']}}})
+        return '', 204
 
 
-# local api, watchlist, DELETE one   TODO add auth here, email passed
+# local api, watchlist, DELETE one
 class WlistItem(Resource):
     def delete(self, mtype, mid, email):
         db = pymongo.MongoClient('localhost', 27017).MediaData
         db.Users.find_one_and_update({'email': email},
             {'$pull': {'watchlist': {'mtype': mtype, 'id': mid}}})
-        return None  # TODO add status returned so other func can flash
+        return '', 204
 
-# set up api resource routing
+# set up api resource routing, TODO add auth on POST and DELETE requests
 api.add_resource(Media, '/apiv1.0/<mtype>/<int:mid>')
 api.add_resource(Wlist, '/apiv1.0/watchlist')
 api.add_resource(WlistItem, '/apiv1.0/watchlist/<mtype>/<int:mid>/<email>')
 
 
 # route to allow python to make HTTP DELETE request
-@app.route('/delete/<mtype>/<int:mid>')
+@app.route('/watchlist/delete/<mtype>/<int:mid>', methods=['GET'])
 @is_logged_in
-def delFromWatchlist(mtype='movie', mid=None):
-    media = requests.delete(api.url_for(WlistItem, mtype=mtype,
-                mid=mid, _external=True, email=session['email']))
+def delFromWatchlist(mtype=None, mid=None):
+    response = requests.delete(api.url_for(WlistItem, mtype=mtype,
+                 mid=mid, _external=True, email=session['email']))
+    if response.status_code == 204:
+        flash('Item deleted from watchlist', 'success')
+    else:
+        flash('Item not deleted from watchlist', 'danger')
     return redirect(url_for('watchlist'))
     
 
-# display user's watchlist
-@app.route('/watchlist')
+# GET display user's watchlist, or POST new item to watchlist
+@app.route('/watchlist', methods=['GET', 'POST'])
 @is_logged_in
 def watchlist():
+    if request.method == 'POST':
+        response = requests.post(api.url_for(Wlist, _external=True),
+            data={
+                'mid': request.form['mid'], 'mtype': request.form['mtype'],
+                'title': request.form['title'], 'year': request.form['year'],
+                'email': session['email']})
+        if response.status_code == 204:
+            flash('Item added to watchlist', 'success')
+        elif response.status_code == 404:
+            flash('Item already in watchlist', 'danger')
+        else:
+            flash('Item not added to watchlist', 'danger')
+        return redirect(url_for('watchlist'))
+        
     mtype = request.args.get('mtype')  # retains search dropdown value
 
     # connect to db and get user
@@ -214,8 +224,10 @@ def watchlist():
             m = add_src_display(m, item['mtype'])
             m['mtype'] = item['mtype']
             wl_detail.append(m)
-        else:
-            print 'no media found for:', item['title']  # TODO make display but show no sources
+        else:  # if api did not return data for the item
+            item['title'] += '*'
+            item['themoviedb'] = item['id']
+            wl_detail.append(item)
 
     print 'time to get media of full watchlist: ', time.time() - start
     return render_template('watchlist.html', medias=wl_detail, mtype=mtype)
@@ -257,12 +269,12 @@ def search(mtype='movie', query=''):
         return render_template('searchresults.html', query=query)
 
     # if just one has results, go directly to media info page
-    elif len(mv['results']) == 0:
-        return redirect(url_for('mediainfo', mtype='show',
-                                tmdbid=sh['results'][0]['id']))
-    elif len(sh['results']) == 0:
+    elif len(sh['results']) == 0 and len(mv['results']) == 1:
         return redirect(url_for('mediainfo', mtype='movie',
-                                tmdbid=mv['results'][0]['id']))
+                                mid=mv['results'][0]['id']))
+    elif len(mv['results']) == 0 and len(sh['results']) == 1:
+        return redirect(url_for('mediainfo', mtype='show',
+                                mid=sh['results'][0]['id']))
 
     # display multiple results (without sources) for user to choose
     else:
@@ -271,36 +283,31 @@ def search(mtype='movie', query=''):
 
 
 # lookup via media id for mediainfo.html
-@app.route('/<mtype>/id/<int:tmdbid>', methods=['GET'])
-def mediainfo(mtype='movie', tmdbid=None):
+@app.route('/<mtype>/id/<int:mid>', methods=['GET'])
+def mediainfo(mtype='movie', mid=None):
     mtype = 'movie' if mtype != 'show' else 'show'
 
-    # get summary info from themoviedb api
+    # get summary info from themoviedb api, exit if not found
     params = {'api_key': json.loads(open('apikeys.json').read())['tmdb']}
+    tmdb_url = ('https://api.themoviedb.org/3/movie/' if mtype == 'movie'
+        else 'https://api.themoviedb.org/3/tv/')
+    summary = requests.get(tmdb_url + str(mid), params=params)
+    if summary.status_code != 200:
+        flash('Media id not found', 'danger')
+        return redirect(url_for('home'))
+    summary = summary.json()
     if mtype == 'movie':
-        tmdb_url = 'https://api.themoviedb.org/3/movie/'
-        summary = requests.get(tmdb_url + str(tmdbid), params=params)
-        summary = summary.json()
         summary['year'] = summary['release_date'][:4]
     else:
-        tmdb_url = 'https://api.themoviedb.org/3/tv/'
-        summary = requests.get(tmdb_url + str(tmdbid), params=params)
-        summary = summary.json()
         summary['title'] = summary['name']
         summary['year'] = summary['first_air_date'][:4]
 
-    # local api request
+    # local api request and add display sources
     media = requests.get(api.url_for(Media, mtype=mtype,
-                                     mid=tmdbid, _external=True))
-
-    # add display sources
+                                     mid=mid, _external=True))
     if media:
         media = json.loads(media.json())
         media = add_src_display(media, mtype)
-
-    #if summary.status_code != 200: TODO break up above if/else into another if/else
-    #    flash('Media id not found', 'danger')
-    #    return redirect(url_for('home'))
 
     return render_template('mediainfo.html', media=media,
                            mtype=mtype, summary=summary)
