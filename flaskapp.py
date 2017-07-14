@@ -12,7 +12,7 @@ import datetime
 import requests
 from wtforms import Form, StringField, PasswordField, validators
 from passlib.hash import sha256_crypt
-from shared_func import get_media, add_src_display
+from shared_func import add_src_display
 from functools import wraps
 app = Flask(__name__)
 api = Api(app)

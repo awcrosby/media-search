@@ -20,9 +20,10 @@
         <tr>
           <td>
             {% if m['mtype'] == 'show' %}
-                {{ '\U0001F4FA' }}
+                <img class="icon" src="static/glyphicon-tv.png" alt="tv icon" />
+                <!-- {{ '\U0001F4FA' }} -->
             {% else %}
-                <span class="glyphicon glyphicon-film" aria-hidden="true"></span>
+                <img class="icon" src="static/glyphicon-film.png" alt="film icon" />
                 <!-- {{ '\U0001F3A5' }} -->
             {% endif %}
           </td>

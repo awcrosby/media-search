@@ -5,6 +5,12 @@
     margin: 4px auto 4px auto;  /* top right bottom left */
  }
 
+.icon {
+    width: 17px;
+    height: 17px;
+    margin-left: 5px;
+}
+
 /* http://stackoverflow.com/questions/30930792/how-to-make-divs-that-automatically-wrap-to-the-next-row */
 .source {
     display: inline-block;
