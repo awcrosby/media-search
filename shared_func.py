@@ -92,7 +92,7 @@ def add_src_display(media, mtype):
     src_display = s1 + s2 + s3
 
     # append to media src_display and mtype
-    media['src_display'] = src_display
+    media['sources'] = src_display
     media['mtype'] = mtype
 
     return media

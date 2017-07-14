@@ -26,7 +26,7 @@
     </div>
 
     <!-- display sources if found -->
-    {% if not media or not media['src_display'] %}
+    {% if not media or not media['sources'] %}
         <div class="clearfix" style="margin-top: 20px; color: red">
           {% if media['_id'] %}  <!-- media came from the database -->
               There are no streaming sources for this {{ mtype }}
@@ -34,9 +34,9 @@
               We do not have infomation about this {{ mtype }}
           {% endif %}
         </div>
-    {% elif media and media['src_display'] %}
+    {% elif media and media['sources'] %}
         <div class="clearfix" style="margin-top: 20px"></div>
-        {% for s in media['src_display'] %}
+        {% for s in media['sources'] %}
             <!-- display logo or title in source boxes -->
             <div class="source">
               {% if s['source'] in ['netflix', 'hulu_plus', 'amazon_prime', 'hbo_now', 'showtime_subscription'] %}

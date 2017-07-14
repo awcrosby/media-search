@@ -138,6 +138,16 @@ class Media(Resource):
         return dumps(media), 200  # pymongo BSON conversion to json
 
 
+# local api media interaction
+class Media2(Resource):
+    def get(self, mtype, mid):
+        db = pymongo.MongoClient('localhost', 27017).MediaData
+        media = db.Media.find_one({'mtype': mtype, 'id': mid})
+        if not media:
+            return '', 404
+        return dumps(media), 200  # pymongo BSON conversion to json
+
+
 # local api, watchlist, GET all or POST one
 class Wlist(Resource):
     def get(self):
@@ -173,6 +183,7 @@ class WlistItem(Resource):
 
 # set up api resource routing, TODO add auth on POST and DELETE requests
 api.add_resource(Media, '/apiv1.0/<mtype>/<int:mid>')
+api.add_resource(Media2, '/apiv2.0/<mtype>/<int:mid>')
 api.add_resource(Wlist, '/apiv1.0/watchlist')
 api.add_resource(WlistItem, '/apiv1.0/watchlist/<mtype>/<int:mid>/<email>')
 
@@ -217,17 +228,28 @@ def watchlist():
 
     wl_detail = []
     for item in user['watchlist']:
-        m = requests.get(api.url_for(Media, mtype=item['mtype'],
-                                     mid=int(item['id']), _external=True))
-        if m:
-            m = json.loads(m.json())
-            m = add_src_display(m, item['mtype'])
-            m['mtype'] = item['mtype']
-            wl_detail.append(m)
-        else:  # if api did not return data for the item
-            item['title'] += '*'
-            item['themoviedb'] = item['id']
-            wl_detail.append(item)
+        if session['email'] == 'dale@coop.com':  # apiv2.0 for this user
+            m = requests.get(api.url_for(Media2, mtype=item['mtype'],
+                                         mid=int(item['id']), _external=True))
+            if m:
+                m = json.loads(m.json())
+                wl_detail.append(m)
+            else:  # if api did not return data for the item
+                item['title'] += '*'
+                wl_detail.append(item)
+
+        else:
+            m = requests.get(api.url_for(Media, mtype=item['mtype'],
+                                         mid=int(item['id']), _external=True))
+            if m:
+                m = json.loads(m.json())
+                m = add_src_display(m, item['mtype'])
+                m['mtype'] = item['mtype']
+                wl_detail.append(m)
+            else:  # if api did not return data for the item
+                item['title'] += '*'
+                item['themoviedb'] = item['id']
+                wl_detail.append(item)
 
     print 'time to get media of full watchlist: ', time.time() - start
     return render_template('watchlist.html', medias=wl_detail, mtype=mtype)
@@ -305,9 +327,14 @@ def mediainfo(mtype='movie', mid=None):
     # local api request and add display sources
     media = requests.get(api.url_for(Media, mtype=mtype,
                                      mid=mid, _external=True))
-    if media:
+    if media.status_code == 200:
         media = json.loads(media.json())
         media = add_src_display(media, mtype)
+
+    if session['email'] == 'dale@coop.com':  # apiv2.0 for this user
+        media = requests.get(api.url_for(Media2, mtype=mtype,
+                                         mid=mid, _external=True))
+        media = json.loads(media.json())
 
     return render_template('mediainfo.html', media=media,
                            mtype=mtype, summary=summary)
