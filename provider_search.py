@@ -23,7 +23,52 @@ def main():
 
     ''' get titles for particular source - function for each source
         big_5 then other?: crackle, starz, cinemax, amzchannels, amc (limited ep)'''
-    search_showtime()
+    #search_hbo()
+    #search_showtime()
+
+
+def search_hbo():
+    # source dict to be added to media sources[] in db for found titles
+    source = {'source': 'hbo_now',
+              'display_name': 'HBO',
+              'link': 'http://www.hbo.com',
+              'type': 'subscription_web_sources'}
+
+    # MOVIE SEARCH SECTION
+    pages = ['http://www.hbo.com/movies/catalog',
+             'http://www.hbo.com/documentaries/catalog']
+    for page in pages:
+        r = requests.get(page)
+        soup = BeautifulSoup(r.text, 'html.parser')
+
+        # get script with full dictionary of all page data
+        script = soup.find('script', {'data-id': 'reactContent'}).text
+
+        # extract json from <script> response (after equals)
+        data = json.loads(script[script.find('=')+1:])
+
+        movies = data['content']['navigation']['films']
+        titles = [m['title'] for m in movies if m['link']]
+        medias = get_medias_from_titles(titles, mtype='movie')
+        medias_to_db_with_source(medias, source)
+
+
+    # SHOW SEARCH SECTION
+    r = requests.get('http://www.hbo.com')
+    soup = BeautifulSoup(r.text, 'html.parser')
+
+    # get script with full dictionary of all page data
+    script = soup.find('script', {'data-id': 'reactContent'}).text
+
+    # extract json from <script> response (after equals)
+    data = json.loads(script[script.find('=')+1:])
+
+    shows = (data['navigation']['toplevel'][0]['subCategory'][0]['items'] +
+             data['navigation']['toplevel'][0]['subCategory'][1]['items'])
+    titles = [s['name'] for s in shows]
+    medias = get_medias_from_titles(titles, mtype='show')
+    medias_to_db_with_source(medias, source)
+
 
 def search_showtime():
     # source dict to be added to media sources[] in db for found titles
@@ -36,13 +81,12 @@ def search_showtime():
     base_url = 'http://www.sho.com'
     r = requests.get(base_url + '/movies')
     soup = BeautifulSoup(r.text, 'html.parser')
-    full_mov_lib = soup.find('section', {'data-context': 'slider:genres'})
 
     # get all movie genre pages
+    full_mov_lib = soup.find('section', {'data-context': 'slider:genres'})
     genre_links = full_mov_lib.find_all('a', {'class': 'promo__link'})
     genre_links = [a['href'] for a in genre_links]
     genre_links = [i for i in genre_links if 'adult' not in i]
-    genre_links = ['/movies/music']  #TESTING TODO
 
     # for all root genre pages, get extra pagination links to scrape
     all_extra_pages = []
@@ -77,7 +121,7 @@ def search_showtime():
 
     # get all show titles
     title_links = all_series.find_all('a', {'class': 'promo__link'})
-    titles = [a.text for a in title_links]
+    titles = [a.text.strip() for a in title_links]
 
     medias = get_medias_from_titles(titles, mtype='show')
     medias_to_db_with_source(medias, source)
@@ -120,7 +164,9 @@ def get_medias_from_titles(titles, mtype):
 
         # build medias dictionary
         medias.append(m)
-        logging.info('tmdb found ' + m['mtype'] + ': ' + m['title'])
+        logging.info('tmdb found ' + mtype + ': ' + title)
+        if m['title'].lower() != title.lower():
+            logging.warning('not exact titles: ' + title + ' | ' + m['title'])
     return medias
 
 
