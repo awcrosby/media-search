@@ -15,8 +15,6 @@ import logging
 
 
 def main():
-    # connect to mongodb, set logging config
-    db = pymongo.MongoClient('localhost', 27017).MediaData
     logging.basicConfig(filename='/home/awcrosby/media-search/'
                         'log/provider_search.log',
                         format='%(asctime)s %(levelname)s: %(message)s',
@@ -25,8 +23,16 @@ def main():
 
     ''' get titles for particular source - function for each source
         big_5 then other?: crackle, starz, cinemax, amzchannels, amc (limited ep)'''
+    search_showtime()
 
-    # ##### showtime media scraping #####
+def search_showtime():
+    # source dict to be added to media sources[] in db for found titles
+    source = {'source': 'showtime_subscription',
+              'display_name': 'Showtime',
+              'link': 'http://www.showtime.com',
+              'type': 'subscription_web_sources'}
+
+    # MOVIE SEARCH SECTION
     base_url = 'http://www.sho.com'
     r = requests.get(base_url + '/movies')
     soup = BeautifulSoup(r.text, 'html.parser')
@@ -36,7 +42,7 @@ def main():
     genre_links = full_mov_lib.find_all('a', {'class': 'promo__link'})
     genre_links = [a['href'] for a in genre_links]
     genre_links = [i for i in genre_links if 'adult' not in i]
-    #genre_links = ['/movies/music']  #TESTING
+    genre_links = ['/movies/music']  #TESTING TODO
 
     # for all root genre pages, get extra pagination links to scrape
     all_extra_pages = []
@@ -59,33 +65,51 @@ def main():
         for div in divs:
             titles.append(div.text.strip())
 
+    medias = get_medias_from_titles(titles, mtype='movie')
+    medias_to_db_with_source(medias, source)
 
-    # ##### TODO make into function #####
 
-    # turn list of title text into list of dictionaries
+    # SHOW SEARCH SECTION
+    r = requests.get(base_url + '/series')
+    soup = BeautifulSoup(r.text, 'html.parser')
+    all_series = soup.find('section',
+        {'data-context': 'promo group:All Showtime Series'})
+
+    # get all show titles
+    title_links = all_series.find_all('a', {'class': 'promo__link'})
+    titles = [a.text for a in title_links]
+
+    medias = get_medias_from_titles(titles, mtype='show')
+    medias_to_db_with_source(medias, source)
+
+
+def get_medias_from_titles(titles, mtype):
     tmdb_url = 'https://api.themoviedb.org/3/search/'
     params = {'api_key': json.loads(open('apikeys.json').read())['tmdb']}
-    source_media = []
+    medias = []
     titles = set(titles)  # keeps unique, movies listed in multi genres
+
     for title in titles:
+        # if year is in title, remove from title and use as search param
         if re.search('\([0-9][0-9][0-9][0-9]\)$', title):
             title_year = title[-5:-1]
             title = title[:-6].strip()
             params['year'] = title_year
+
         # get media dict from themoviedb, sleep due to api rate limit
         params['query'] = title
         time.sleep(0.2)
-        search = requests.get(tmdb_url+'movie', params=params).json()
+        search_type = 'movie' if mtype == 'movie' else 'tv'
+        search = requests.get(tmdb_url+search_type, params=params).json()
         params.pop('year', None)  # clears year if user
 
         # exit iteration if no results
         if search['total_results'] < 1:
-            print title, '- themoviedb returned 0 results'
+            logging.warning('tmdb 0 results for ' + mtype + ': ' + title)
             continue
 
         # append data so dict can be saved to database
         m = search['results'][0]
-        mtype = 'movie'  # TEMP
         m['mtype'] = mtype
         m['sources'] = []
         if mtype == 'movie':
@@ -94,28 +118,28 @@ def main():
             m['title'] = m['name']
             m['year'] = m['first_air_date'][:4]
 
-        # build source_media dictionary
-        source_media.append(m)
+        # build medias dictionary
+        medias.append(m)
+        logging.info('tmdb found ' + m['mtype'] + ': ' + m['title'])
+    return medias
+
+
+def medias_to_db_with_source(medias, source):
+    db = pymongo.MongoClient('localhost', 27017).MediaData
 
     # write db media if new
-    for m in source_media:
+    for m in medias:
         if not db.Media.find_one({'mtype': m['mtype'], 'id': m['id']}):
             db.Media.insert_one(m)
-
-    # build source dict for current provider
-    source = {'source': 'showtime_subscription',
-              'display_name': 'Showtime',
-              'link': 'http://www.showtime.com',
-              'type': 'subscription_web_sources'}
+            logging.info('db wrote new media: ' + m['title'])
 
     # update db media with source
-    for m in source_media:
+    for m in medias:
         db_media = db.Media.find_one({'mtype': m['mtype'], 'id': m['id']})
         if source not in db_media['sources']:
             db.Media.find_one_and_update({'mtype': m['mtype'], 'id': m['id']},
                 {'$push': {'sources': source}})
-
-    import q; q.d()
+            logging.info(source['source'] + ' added for: ' + m['title'])
 
     ''' example scrape: clear database, get 800 sho titles then tmdb media,
     see none in db, append 'mtype' and add, then add source to all

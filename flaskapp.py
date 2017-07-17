@@ -228,14 +228,16 @@ def watchlist():
 
     wl_detail = []
     for item in user['watchlist']:
-        if session['email'] == 'dale@coop.com':  # apiv2.0 for this user
+        if ('email' in session) and session['email'] == 'dale@coop.com':
             m = requests.get(api.url_for(Media2, mtype=item['mtype'],
                                          mid=int(item['id']), _external=True))
-            if m:
+            if m:  # TODO apiv2.0 for this user
                 m = json.loads(m.json())
+                m['themoviedb'] = m['id']
                 wl_detail.append(m)
             else:  # if api did not return data for the item
                 item['title'] += '*'
+                item['themoviedb'] = item['id']
                 wl_detail.append(item)
 
         else:
@@ -331,10 +333,11 @@ def mediainfo(mtype='movie', mid=None):
         media = json.loads(media.json())
         media = add_src_display(media, mtype)
 
-    if session['email'] == 'dale@coop.com':  # apiv2.0 for this user
+    if ('email' in session) and session['email'] == 'dale@coop.com':
         media = requests.get(api.url_for(Media2, mtype=mtype,
                                          mid=mid, _external=True))
-        media = json.loads(media.json())
+        if media.status_code == 200:
+            media = json.loads(media.json())
 
     return render_template('mediainfo.html', media=media,
                            mtype=mtype, summary=summary)
