@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 import sys
 import requests
 import requests_cache
@@ -8,7 +9,9 @@ import json
 import re
 from pprint import pprint
 import time
+import random
 import logging
+from selenium import webdriver
 
 '''provider_search.py goes to media providers to
     search for media availability and write to db''' 
@@ -18,15 +21,91 @@ def main():
     logging.basicConfig(filename='/home/awcrosby/media-search/'
                         'log/provider_search.log',
                         format='%(asctime)s %(levelname)s: %(message)s',
-                        level=logging.INFO)
+                        level=logging.WARNING)
     requests_cache.install_cache('demo_cache')
 
     ''' get titles for particular source - function for each source
         big_5 then other?: crackle, starz, cinemax, amzchannels, amc (limited ep)'''
+
     #search_hbo()
     #search_showtime()
+    search_netflix()
 
 
+def search_netflix():
+    # source dict to be added to media sources[] in db for found titles
+    source = {'source': 'netflix',
+              'display_name': 'Netflix',
+              'link': 'http://www.netflix.com',
+              'type': 'subscription_web_sources'}
+
+    # log in to provider
+    driver = webdriver.PhantomJS()
+    driver.set_window_size(1920, 1080)
+    driver.get('https://www.netflix.com/login')
+    inputs = driver.find_elements_by_tag_name('input')
+    inputs[0].send_keys('boombox200@gmail.com')
+    inputs[1].send_keys('BJUXSkjnD_9t')
+    driver.find_element_by_tag_name('button').click()
+    
+    # MOVIE SEARCH SECTION
+    genre_pages = [
+                   'https://www.netflix.com/browse/genre/1365',  # action
+                   'https://www.netflix.com/browse/genre/5763',  # drama
+                   'https://www.netflix.com/browse/genre/7077',  # indie
+                   'https://www.netflix.com/browse/genre/8711',  # horror
+                   'https://www.netflix.com/browse/genre/6548',  # comedy
+                   'https://www.netflix.com/browse/genre/31574',  # classics
+                   'https://www.netflix.com/browse/genre/7424',  # anime
+                   'https://www.netflix.com/browse/genre/783',  # kid
+                   'https://www.netflix.com/browse/genre/7627',  # cult
+                   'https://www.netflix.com/browse/genre/6839',  # docs ~1321
+                   'https://www.netflix.com/browse/genre/5977',  # gay
+                   'https://www.netflix.com/browse/genre/78367', # internat'l
+                   'https://www.netflix.com/browse/genre/8883',  # romance
+                   'https://www.netflix.com/browse/genre/1492',  # scifi
+                   'https://www.netflix.com/browse/genre/8933'  # thrillers
+                  ]
+    titles = []
+    for page in genre_pages:
+        # get initial page and scroll to bottom many times
+        driver.get(page)
+        for i in range(36):
+            driver.execute_script("window.scrollTo(
+                                        0, document.body.scrollHeight);")
+            time.sleep(float(random.randrange(90, 140, 1))/100)
+
+        # put source into beautifulsoup and get titles
+        soup = BeautifulSoup(driver.page_source, 'html.parser')
+        divs = soup('div', 'video-preload-title-label')
+        print len(divs), 'titles on page:', page
+        titles += [d.text for d in divs]
+
+    medias = get_medias_from_titles(titles, mtype='movie')
+    medias_to_db_with_source(medias, source)
+
+    # SHOW SEARCH SECTION
+    genre_pages = ['https://www.netflix.com/browse/genre/83']  # tv ~1500
+    titles = []
+    for page in genre_pages:
+        # get initial page and scroll to bottom many times
+        driver.get(page)
+        for i in range(40):
+            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            time.sleep(float(random.randrange(90, 140, 1))/100)
+
+        # put source into beautifulsoup and get titles
+        soup = BeautifulSoup(driver.page_source, 'html.parser')
+        divs = soup('div', 'video-preload-title-label')
+        print len(divs), 'titles on page:', page
+        titles += [d.text for d in divs]
+
+    medias = get_medias_from_titles(titles, mtype='show')
+    medias_to_db_with_source(medias, source)
+
+    driver.quit()
+
+ 
 def search_hbo():
     # source dict to be added to media sources[] in db for found titles
     source = {'source': 'hbo_now',
@@ -131,7 +210,9 @@ def get_medias_from_titles(titles, mtype):
     tmdb_url = 'https://api.themoviedb.org/3/search/'
     params = {'api_key': json.loads(open('apikeys.json').read())['tmdb']}
     medias = []
+    print 'len(titles) before unique: ', len(titles)
     titles = set(titles)  # keeps unique, movies listed in multi genres
+    print 'len(titles) after unique: ', len(titles)
 
     for title in titles:
         # if year is in title, remove from title and use as search param
@@ -147,7 +228,10 @@ def get_medias_from_titles(titles, mtype):
         search = requests.get(tmdb_url+search_type, params=params).json()
         params.pop('year', None)  # clears year if user
 
-        # exit iteration if no results
+        # exit iteration if search not complete or no results
+        if 'total_results' not in search:
+            logging.error('tmdb search not complete ' + mtype + ': ' + title)
+            continue
         if search['total_results'] < 1:
             logging.warning('tmdb 0 results for ' + mtype + ': ' + title)
             continue
@@ -165,7 +249,11 @@ def get_medias_from_titles(titles, mtype):
         # build medias dictionary
         medias.append(m)
         logging.info('tmdb found ' + mtype + ': ' + title)
-        if m['title'].lower() != title.lower():
+
+        # check if titles are not exact match, in future may not append these
+        t1 = title.translate({ord(c): None for c in "'’:"})
+        t2 = m['title'].translate({ord(c): None for c in "'’:"})
+        if t1.lower().replace('&', 'and') != t2.lower().replace('&', 'and'):
             logging.warning('not exact titles: ' + title + ' | ' + m['title'])
     return medias
 

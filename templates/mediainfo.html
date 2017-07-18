@@ -11,16 +11,21 @@
     <div class="clearfix" style="margin-top: 20px">
         {% if summary %}
             <img style="margin-right: 15px; float: left; width: 120px;" src="{{ img_base_url + summary['poster_path'] }}" alt="Media result image" />
-            <strong>{{ summary['title'] }} ({{ summary['year'] }})</strong>
-            - {{ summary['overview'] }}
+            <div><strong>{{ summary['title'] }} ({{ summary['year'] }})</strong></div>
+            {% if mtype == 'show' %}
+                <div><em>{{ summary['number_of_seasons'] }} seasons, {{ summary['number_of_episodes'] }} episodes</em></div>
+            {% endif %}
+            <div>{{ summary['overview'] }}</div>
             {% if session.logged_in %}
-              <form method="POST" action="/watchlist">
-                <input type="hidden" name="mid" value="{{ summary['id'] }}" />
-                <input type="hidden" name="mtype" value="{{ mtype }}" />
-                <input type="hidden" name="title" value="{{ summary['title'] }}" />
-                <input type="hidden" name="year" value="{{ summary['year'] }}" />
-                <button type="submit" class="btn btn-primary">Add to Watchlist</button>
-              </form>
+              <div style='margin-top:5px'>
+                <form method="POST" action="/watchlist">
+                  <input type="hidden" name="mid" value="{{ summary['id'] }}" />
+                  <input type="hidden" name="mtype" value="{{ mtype }}" />
+                  <input type="hidden" name="title" value="{{ summary['title'] }}" />
+                  <input type="hidden" name="year" value="{{ summary['year'] }}" />
+                  <button type="submit" class="btn btn-primary">Add to Watchlist</button>
+                </form>
+              </div>
             {% endif %}
         {% endif %}
     </div>
