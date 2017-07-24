@@ -66,7 +66,8 @@ def search_netflix():
                    'https://www.netflix.com/browse/genre/1492',  # scifi
                    'https://www.netflix.com/browse/genre/8933'  # thrillers
                   ]
-    titles = []
+
+    titles = []  # TODO replace this with a dictionary of what found in scrape
     for page in genre_pages:
         # get initial page and scroll to bottom many times
         driver.get(page)
@@ -207,11 +208,26 @@ def search_showtime():
 
 
 def get_medias_from_titles(titles, mtype):
+    # TODO pass prov_dict={title:'a', link:'/mov', source_id:123}, mtype, source
+    # (define source directly above call)
+    # from title get tmdb id
+    # clean db write with no source if new (combine 2 functions) write_media_from_titles()
+    # now append the source based on new source[] created from d[link] and source
+    # -maybe also append any other data found in prov_dict like source_id (later can see if source id in db)
+    # -if d[link] null used link in source
+
+    ''' later maybe remove sources so no need to clear db if want to run one source
+    -from db get: db_mv_mids and db_sh_mids
+    -from scrape make: pr_mv_mids and pr_sh_mids
+    -for set(db_mv_mids - pr_mv_mids): remove source
+    -for set(db_sh_mids - pr_sh_mids): remove source '''
+
+    # setup for api to go from textal title to id
     tmdb_url = 'https://api.themoviedb.org/3/search/'
     params = {'api_key': json.loads(open('apikeys.json').read())['tmdb']}
     medias = []
     print 'len(titles) before unique: ', len(titles)
-    titles = set(titles)  # keeps unique, movies listed in multi genres
+    titles = set(titles)  # keeps unique, since movies listed in multi genres
     print 'len(titles) after unique: ', len(titles)
 
     for title in titles:
@@ -226,7 +242,7 @@ def get_medias_from_titles(titles, mtype):
         time.sleep(0.2)
         search_type = 'movie' if mtype == 'movie' else 'tv'
         search = requests.get(tmdb_url+search_type, params=params).json()
-        params.pop('year', None)  # clears year if user
+        params.pop('year', None)  # clears year if used
 
         # exit iteration if search not complete or no results
         if 'total_results' not in search:
@@ -280,31 +296,12 @@ def medias_to_db_with_source(medias, source):
     now get 500 hbo, for the 100 overlap it will not add to db, 400 will add
     now add source to all 500 '''
 
-    ''' later maybe remove sources so no need to clear db if want to run one source
-    -from db get: db_mv_mids and db_sh_mids
-    -from scrape make: pr_mv_mids and pr_sh_mids
-    -for set(db_mv_mids - pr_mv_mids): remove source
-    -for set(db_sh_mids - pr_sh_mids): remove source '''
-
     ''' one-time db statements: create/view indexes, del all docs in col '''
     # db.Media.create_index([('mtype', pymongo.ASCENDING), ('id', pymongo.ASCENDING)])
     # print sorted(list(db.Shows.index_information()))
     # print db.Media.delete_many({})  # delete all shows in database
     # print db.Media.count()
     # import q; q.d()
-
-    ''' Media {
-         'id': 123
-         'mtype': 'movie'
-         'title': 'Reservoir Dogs'
-         'year': 1991
-         'sources': [
-           {
-             'source': 'netflix',
-             'display_name': 'Netflix'
-             #later: link, num_episodes, seasons[]
-           }
-         ]'''
 
 
 if __name__ == "__main__":

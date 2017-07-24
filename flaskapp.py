@@ -59,6 +59,13 @@ def home():
     return render_template('home.html')
 
 
+# about page
+@app.route('/about')
+@is_logged_in
+def about():
+    return render_template('about.html')
+
+
 # user registration
 @app.route('/register', methods=['GET', 'POST'])
 def register():
@@ -277,16 +284,18 @@ def search(mtype='movie', query=''):
     logging.info('user query: ' + query + mtype)
     print 'user query:', query, mtype
 
-    # perform search with themoviedb api
-    mv, sh, mv['results'], sh['results'] = ({}, {}, {}, {})
+    # search via themoviedb api, take first result and any pop others
+    mv, sh, mv['results'], sh['results'] = ({}, {}, [], [])
     if mtype == 'movie' or mtype == 'all':
         mv = requests.get(tmdb_url+'movie', params=params).json()
-        mv['results'] = [m for m in mv['results']
-                         if m['vote_count'] >= 20 or m['popularity'] > 10]
+        pop_after_first = [m for m in mv['results'][1:]
+                           if m['vote_count'] >= 20 or m['popularity'] > 10]
+        mv['results'] = [mv['results'][0]] + pop_after_first
     if mtype == 'show' or mtype == 'all':
         sh = requests.get(tmdb_url+'tv', params=params).json()
-        sh['results'] = [m for m in sh['results']
-                         if m['vote_count'] >= 20 or m['popularity'] > 10]
+        pop_after_first = [m for m in sh['results'][1:]
+                           if m['vote_count'] >= 20 or m['popularity'] > 10]
+        sh['results'] = [sh['results'][0]] + pop_after_first
 
     # if neither have results render template without sending media
     if (len(mv['results']) + len(sh['results']) == 0):
