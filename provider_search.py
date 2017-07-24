@@ -21,7 +21,7 @@ def main():
     logging.basicConfig(filename='/home/awcrosby/media-search/'
                         'log/provider_search.log',
                         format='%(asctime)s %(levelname)s: %(message)s',
-                        level=logging.WARNING)
+                        level=logging.INFO)
     requests_cache.install_cache('demo_cache')
 
     ''' get titles for particular source - function for each source
@@ -29,8 +29,101 @@ def main():
 
     #search_hbo()
     #search_showtime()
-    search_netflix()
+    #search_netflix()
+    search_hulu()
 
+
+def search_hulu():
+    # source dict to be added to media sources[] in db for found titles
+    source = {'source': 'hulu',
+              'display_name': 'Hulu',
+              'link': 'http://www.hulu.com',
+              'type': 'subscription_web_sources'}
+
+    # go to hulu splash page
+    driver = webdriver.PhantomJS()
+    driver.set_window_size(1920, 1080)
+    driver.get('https://www.hulu.com')
+    time.sleep(1.2)
+
+    # click on log in link
+    links = driver.find_elements_by_tag_name('a')
+    links[2].click()
+    time.sleep(1.2)
+    logging.info('hulu, clicked on log in link')
+
+    # switch to pop-up iframe with login info
+    iframe = driver.find_element_by_id('login-iframe')
+    driver.switch_to_frame(iframe)
+
+    # click on dummy input to make real input visible
+    driver.find_element_by_name('dummy_login').click()
+
+    # enter credentials and click login div
+    driver.find_element_by_id('user_email').send_keys('boombox200@gmail.com')
+    driver.find_element_by_id('password').send_keys('4!A$@AV7DG')
+    logging.info('hulu, pasted u/p')
+    driver.save_screenshot('static/screenshot.png')
+    # driver.find_element_by_id('recaptcha_response_field').send_keys('')
+    login_anchor = driver.find_element_by_class_name('login')
+    login_anchor.find_element_by_tag_name('div').click()
+    time.sleep(1.2)
+
+    # switch out of iframe and click profile link
+    driver.switch_to_default_content()
+    driver.find_element_by_id('98994228').click()
+    time.sleep(1.2)
+    logging.info('hulu, clicked profile')
+    driver.save_screenshot('static/screenshot2.png')
+
+
+    # MOVIE SEARCH SECTION
+    # get all movie genres
+    driver.get('https://www.hulu.com/movies/genres')
+    time.sleep(1.5)
+    all_genre = driver.find_element_by_id('all_movies_genres')
+    anchors = all_genre.find_elements_by_class_name('beacon-click')
+    genre_pages = [a.get_attribute('href') for a in anchors]
+    print 'genre_pages:', genre_pages
+    logging.info('hulu, got movie genres')
+    #import q; q.d()
+
+    media = []
+    for page in genre_pages[:2]:
+        # get page and pointer to top panel, holding about 6 medias
+        driver.get(page)
+        logging.info('did GET on: ' + page)
+        time.sleep(3)
+        top_panel = driver.find_elements_by_class_name('tray')[0]
+        next_btn = top_panel.find_element_by_class_name('next')
+
+        while True:
+            thumbnails = top_panel.find_elements_by_class_name('row')
+            for t in thumbnails:
+                try:
+                    title = t.find_element_by_class_name('title')
+                    title = title.get_attribute('innerHTML')
+                    link = t.find_element_by_class_name('beacon-click')
+                    link = link.get_attribute('href')
+                    media += [{'title': title, 'link': link}]
+                except Exception as err:
+                    logging.error(err.message)
+                    pass
+            # exit loop if next button is not displayed, otherwise click/wait
+            if not next_btn.is_displayed():
+                break
+            next_btn.click()
+            time.sleep(float(random.randrange(1500, 2000, 1))/1000)
+        logging.info(str(len(media)) + ' len(media) for page: ' + page)
+
+    # list of dict into list of tuples, take unique set, then back to dict
+    media = [dict(t) for t in set([tuple(d.items()) for d in media])]
+
+    import q; q.d()
+    driver.quit()
+
+    # put source into beautifulsoup and get titles
+    #soup = BeautifulSoup(driver.page_source, 'html.parser')
 
 def search_netflix():
     # source dict to be added to media sources[] in db for found titles
@@ -72,8 +165,8 @@ def search_netflix():
         # get initial page and scroll to bottom many times
         driver.get(page)
         for i in range(36):
-            driver.execute_script("window.scrollTo(
-                                        0, document.body.scrollHeight);")
+            driver.execute_script(
+                "window.scrollTo(0, document.body.scrollHeight);")
             time.sleep(float(random.randrange(90, 140, 1))/100)
 
         # put source into beautifulsoup and get titles
