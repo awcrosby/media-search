@@ -24,8 +24,8 @@ def main():
                         level=logging.INFO)
     requests_cache.install_cache('demo_cache')
 
-    #search_hbo()
-    search_showtime()
+    search_hbo()
+    #search_showtime()
     #search_netflix()
     #search_hulu()
 
@@ -122,11 +122,13 @@ def search_hulu():
     # put source into beautifulsoup and get titles
     #soup = BeautifulSoup(driver.page_source, 'html.parser')
 
+
 def search_netflix():
     # source dict to be added to media sources[] in db for found titles
+    base_url = 'http://www.netflix.com'
     source = {'name': 'netflix',
               'display_name': 'Netflix',
-              'link': 'http://www.netflix.com',
+              'link': base_url,
               'type': 'subscription_web_sources'}
 
     # log in to provider
@@ -157,10 +159,16 @@ def search_netflix():
                    'https://www.netflix.com/browse/genre/8933'  # thrillers
                   ]
 
-    titles = []  # TODO replace this with a dictionary of what found in scrape
+    medias = []
     for page in genre_pages:
         # get initial page and scroll to bottom many times
-        driver.get(page)
+        try:
+            time.sleep(1.5)
+            driver.get(page)
+        except httplib.BadStatusLine as bsl:
+            logging.error('get page error, will try to pass, msg= ' + bsl.message)
+            pass
+        logging.info('did get on page: ' + page)
         for i in range(36):
             driver.execute_script(
                 "window.scrollTo(0, document.body.scrollHeight);")
@@ -168,32 +176,48 @@ def search_netflix():
 
         # put source into beautifulsoup and get titles
         soup = BeautifulSoup(driver.page_source, 'html.parser')
-        divs = soup('div', 'video-preload-title-label')
-        print len(divs), 'titles on page:', page
-        titles += [d.text for d in divs]
+        divs = soup('div', 'ptrack-content')
+        for d in divs:
+            title = d.find('div', 'video-preload-title-label').text
+            elements = d['data-ui-tracking-context'].split(',')
+            vid_element = [i for i in elements if 'video_id' in i]
+            netflix_id = vid_element[0][vid_element[0].find(':')+1:]
+            link = base_url+'/title/'+netflix_id
+            medias += [{'title': title, 'link': link}]
+        logging.info('len(medias) so far: ' + str(len(medias)))
 
-    medias = get_medias_from_titles(titles, mtype='movie')
-    medias_to_db_with_source(medias, source)
+    lookup_and_write_medias(medias, mtype='movie', source=source)
+
 
     # SHOW SEARCH SECTION
     genre_pages = ['https://www.netflix.com/browse/genre/83']  # tv ~1500
-    titles = []
+    medias = []
     for page in genre_pages:
         # get initial page and scroll to bottom many times
-        driver.get(page)
+        try:
+            time.sleep(1.5)
+            driver.get(page)
+        except httplib.BadStatusLine as bsl:
+            logging.error('get page error, will try to pass, msg= ' + bsl.message)
+            pass
+        logging.info('did get on page: ' + page)
         for i in range(40):
             driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
             time.sleep(float(random.randrange(90, 140, 1))/100)
 
         # put source into beautifulsoup and get titles
         soup = BeautifulSoup(driver.page_source, 'html.parser')
-        divs = soup('div', 'video-preload-title-label')
-        print len(divs), 'titles on page:', page
-        titles += [d.text for d in divs]
+        divs = soup('div', 'ptrack-content')
+        for d in divs:
+            title = d.find('div', 'video-preload-title-label').text
+            elements = d['data-ui-tracking-context'].split(',')
+            vid_element = [i for i in elements if 'video_id' in i]
+            netflix_id = vid_element[0][vid_element[0].find(':')+1:]
+            link = base_url+'/title/'+netflix_id
+            medias += [{'title': title, 'link': link}]
+        logging.info('len(medias) for page: ' + str(len(medias)))
 
-    medias = get_medias_from_titles(titles, mtype='show')
-    medias_to_db_with_source(medias, source)
-
+    lookup_and_write_medias(medias, mtype='show', source=source)
     driver.quit()
 
  
