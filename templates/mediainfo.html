@@ -44,8 +44,8 @@
         {% for s in media['sources'] %}
             <!-- display logo or title in source boxes -->
             <div class="source">
-              {% if s['source'] in ['netflix', 'hulu_plus', 'amazon_prime', 'hbo_now', 'showtime_subscription'] %}
-                  <img class="logo" src="{{ url_for('static', filename=s['source']+'_logo.png') }}" alt="Subscription logo" />
+              {% if s['name'] in ['netflix', 'hulu', 'amazon_prime', 'hbo', 'showtime'] %}
+                  <img class="logo" src="{{ url_for('static', filename=s['name']+'_logo.png') }}" alt="Subscription logo" />
               {% elif s['type'] == 'subscription_web_sources' %}
                   <div class="typefree">Stream with Subscription</div>
                   <div class="name">{{ s['display_name'] }}</div>
@@ -59,26 +59,9 @@
               {% endif %}
 
               <!-- display source info -->
-              {% if mtype == 'show' %}
-                  <div class="sourceinfo">
-                    {{ s['epcount'] }} <a href={{ s['link'] }}>episodes</a>
-                    in season(s): {{ ', '.join(s['seasons']) }}
-                  </div>
-              {% else %}
-                  <div class="sourceinfo">Stream <a href={{ s['link'] }}>movie</a> on {{ s['display_name'] }}</div>
-              {% endif %}
-              <!-- placeholder links for testing
-              {% if s['source'] == 'amazon_prime' %}
-                  <div class="sourceinfo"><a href='test'>Watch free with 30-day trial</a></div>
-              {% elif s['source'] == 'hbo_now' %}
-                  <div class="sourceinfo"><a href='test'>Get HBO on your Amz Prime</a></div>
-                  <div class="sourceinfo">Stream on <a href='test'>HBO Now</a> or <a href='test'>HBO Go</a> with TV provider login</div>
-              {% elif s['source'] == 'showtime_subscription' %}
-                  <div class="sourceinfo"><a href='test'>Get Showtime on your Amz Prime</a></div>
-                  <div class="sourceinfo">Stream on <a href='test'>Showtime</a> or <a href='test'>Showtime Anytime</a> with TV provider login</div>
-              {% elif s['type'] == 'tv_provider' %}
-                  <div class="sourceinfo">Stream with your cable/sat TV account if you have this channel</div>
-              {% endif %} -->
+              <div class="sourceinfo">
+                Stream <a href={{ s['link'] }}>{{ mtype }}</a> on {{ s['display_name'] }}
+              </div>
             </div>
         {% endfor %}
     {% endif %}

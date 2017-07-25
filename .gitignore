@@ -1,0 +1,12 @@
+# Compiled source #
+###################
+*.pyc
+
+# Logs and cache #
+######################
+*.log
+demo_cache.sqlite
+
+# Secure #
+######################
+apikeys.json

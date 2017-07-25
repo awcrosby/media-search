@@ -24,18 +24,15 @@ def main():
                         level=logging.INFO)
     requests_cache.install_cache('demo_cache')
 
-    ''' get titles for particular source - function for each source
-        big_5 then other?: crackle, starz, cinemax, amzchannels, amc (limited ep)'''
-
     #search_hbo()
-    #search_showtime()
+    search_showtime()
     #search_netflix()
-    search_hulu()
+    #search_hulu()
 
 
 def search_hulu():
     # source dict to be added to media sources[] in db for found titles
-    source = {'source': 'hulu',
+    source = {'name': 'hulu',
               'display_name': 'Hulu',
               'link': 'http://www.hulu.com',
               'type': 'subscription_web_sources'}
@@ -127,7 +124,7 @@ def search_hulu():
 
 def search_netflix():
     # source dict to be added to media sources[] in db for found titles
-    source = {'source': 'netflix',
+    source = {'name': 'netflix',
               'display_name': 'Netflix',
               'link': 'http://www.netflix.com',
               'type': 'subscription_web_sources'}
@@ -200,58 +197,15 @@ def search_netflix():
     driver.quit()
 
  
-def search_hbo():
-    # source dict to be added to media sources[] in db for found titles
-    source = {'source': 'hbo_now',
-              'display_name': 'HBO',
-              'link': 'http://www.hbo.com',
-              'type': 'subscription_web_sources'}
-
-    # MOVIE SEARCH SECTION
-    pages = ['http://www.hbo.com/movies/catalog',
-             'http://www.hbo.com/documentaries/catalog']
-    for page in pages:
-        r = requests.get(page)
-        soup = BeautifulSoup(r.text, 'html.parser')
-
-        # get script with full dictionary of all page data
-        script = soup.find('script', {'data-id': 'reactContent'}).text
-
-        # extract json from <script> response (after equals)
-        data = json.loads(script[script.find('=')+1:])
-
-        movies = data['content']['navigation']['films']
-        titles = [m['title'] for m in movies if m['link']]
-        medias = get_medias_from_titles(titles, mtype='movie')
-        medias_to_db_with_source(medias, source)
-
-
-    # SHOW SEARCH SECTION
-    r = requests.get('http://www.hbo.com')
-    soup = BeautifulSoup(r.text, 'html.parser')
-
-    # get script with full dictionary of all page data
-    script = soup.find('script', {'data-id': 'reactContent'}).text
-
-    # extract json from <script> response (after equals)
-    data = json.loads(script[script.find('=')+1:])
-
-    shows = (data['navigation']['toplevel'][0]['subCategory'][0]['items'] +
-             data['navigation']['toplevel'][0]['subCategory'][1]['items'])
-    titles = [s['name'] for s in shows]
-    medias = get_medias_from_titles(titles, mtype='show')
-    medias_to_db_with_source(medias, source)
-
-
 def search_showtime():
     # source dict to be added to media sources[] in db for found titles
-    source = {'source': 'showtime_subscription',
+    base_url = 'http://www.sho.com'
+    source = {'name': 'showtime',
               'display_name': 'Showtime',
-              'link': 'http://www.showtime.com',
+              'link': base_url,
               'type': 'subscription_web_sources'}
 
     # MOVIE SEARCH SECTION
-    base_url = 'http://www.sho.com'
     r = requests.get(base_url + '/movies')
     soup = BeautifulSoup(r.text, 'html.parser')
 
@@ -274,16 +228,28 @@ def search_showtime():
     genre_links.extend(all_extra_pages)
 
     # for all root and extra genre pages, get movie titles
-    titles = []
+    catalog = []
     for link in genre_links:
         r = requests.get(base_url + link)
         soup = BeautifulSoup(r.text, 'html.parser')
-        divs = soup.find_all('div', {'class': 'movies-gallery__title'})
-        for div in divs:
-            titles.append(div.text.strip())
 
-    medias = get_medias_from_titles(titles, mtype='movie')
-    medias_to_db_with_source(medias, source)
+        anchors = soup.find_all('a', {'class': 'movies-gallery__item'})
+        for a in anchors:
+            title = a['data-label']
+            title = title[title.find(':')+1:]
+            link = base_url + a['href']
+            catalog += [{'title': title, 'link': link}]
+
+    # check availability via link, build medias list
+    medias = []
+    for c in catalog:
+        time.sleep(0.25)
+        r = requests.get(c['link'])
+        soup = BeautifulSoup(r.text, 'html.parser')
+        if soup.find(text = 'STREAM THIS MOVIE'):
+            medias += [c]
+
+    lookup_and_write_medias(medias, mtype='movie', source=source)
 
 
     # SHOW SEARCH SECTION
@@ -293,45 +259,100 @@ def search_showtime():
         {'data-context': 'promo group:All Showtime Series'})
 
     # get all show titles
-    title_links = all_series.find_all('a', {'class': 'promo__link'})
-    titles = [a.text.strip() for a in title_links]
+    medias = []
+    anchors = all_series.find_all('a', {'class': 'promo__link'})
+    for a in anchors:
+        title = a.text.strip()
+        link = base_url + a['href']
+        medias += [{'title': title, 'link': link}]
 
-    medias = get_medias_from_titles(titles, mtype='show')
-    medias_to_db_with_source(medias, source)
+    lookup_and_write_medias(medias, mtype='show', source=source)
 
 
-def get_medias_from_titles(titles, mtype):
-    # TODO pass prov_dict={title:'a', link:'/mov', source_id:123}, mtype, source
-    # (define source directly above call)
-    # from title get tmdb id
-    # clean db write with no source if new (combine 2 functions) write_media_from_titles()
-    # now append the source based on new source[] created from d[link] and source
-    # -maybe also append any other data found in prov_dict like source_id (later can see if source id in db)
-    # -if d[link] null used link in source
+def search_hbo():
+    # source dict to be added to media sources[] in db for found titles
+    base_url = 'http://www.hbo.com'
+    source = {'name': 'hbo',
+              'display_name': 'HBO',
+              'link': base_url,
+              'type': 'subscription_web_sources'}
 
-    ''' later maybe remove sources so no need to clear db if want to run one source
-    -from db get: db_mv_mids and db_sh_mids
-    -from scrape make: pr_mv_mids and pr_sh_mids
-    -for set(db_mv_mids - pr_mv_mids): remove source
-    -for set(db_sh_mids - pr_sh_mids): remove source '''
+    # MOVIE SEARCH SECTION
+    pages = ['http://www.hbo.com/movies/catalog',
+             'http://www.hbo.com/documentaries/catalog']
+    for page in pages:
+        r = requests.get(page)
+        soup = BeautifulSoup(r.text, 'html.parser')
 
-    # setup for api to go from textal title to id
+        # get script with full dictionary of all page data
+        script = soup.find('script', {'data-id': 'reactContent'}).text
+
+        # extract json from <script> response (after equals)
+        data = json.loads(script[script.find('=')+1:])
+
+        # get full movie catalog
+        movies = data['content']['navigation']['films']
+        catalog = [{'title': m['title'], 'link': base_url + '/' + m['link']}
+                  for m in movies if m['link']]
+
+        # check availability via movie link, build medias list
+        medias = []
+        for c in catalog:
+            r = requests.get(c['link'])
+            soup = BeautifulSoup(r.text, 'html.parser')
+            if soup.find(text = 'NOW & GO'):
+                medias += [c]
+
+        lookup_and_write_medias(medias, mtype='movie', source=source)
+    
+
+    # SHOW SEARCH SECTION
+    r = requests.get('http://www.hbo.com')
+    soup = BeautifulSoup(r.text, 'html.parser')
+
+    # get script with full dictionary of all page data
+    script = soup.find('script', {'data-id': 'reactContent'}).text
+
+    # extract json from <script> response (after equals)
+    data = json.loads(script[script.find('=')+1:])
+
+    # get all shows, with title and link
+    shows = (data['navigation']['toplevel'][0]['subCategory'][0]['items'] +
+             data['navigation']['toplevel'][0]['subCategory'][1]['items'])
+    catalog = [{'title': m['name'], 'link': base_url + m['nav']}
+             for m in shows]
+
+    # check availability via link, build medias list
+    medias = []
+    for c in catalog:
+        r = requests.get(c['link'])
+        soup = BeautifulSoup(r.text, 'html.parser')
+        if soup.find(text = 'NOW & GO'):
+            medias += [c]
+
+    lookup_and_write_medias(medias, mtype='show', source=source)
+
+
+def lookup_and_write_medias(medias, mtype, source):
+    # setup for api and database
     tmdb_url = 'https://api.themoviedb.org/3/search/'
     params = {'api_key': json.loads(open('apikeys.json').read())['tmdb']}
-    medias = []
-    print 'len(titles) before unique: ', len(titles)
-    titles = set(titles)  # keeps unique, since movies listed in multi genres
-    print 'len(titles) after unique: ', len(titles)
+    db = pymongo.MongoClient('localhost', 27017).MediaData
 
-    for title in titles:
+    # get unique: list of dict into list of tuples, set, back to dict
+    logging.info('len(medias) before take unique: ' + str(len(medias)))
+    medias = [dict(t) for t in set([tuple(d.items()) for d in medias])]
+    logging.info('len(medias) after take unique: ' + str(len(medias)))
+
+    for m in medias:
         # if year is in title, remove from title and use as search param
-        if re.search('\([0-9][0-9][0-9][0-9]\)$', title):
-            title_year = title[-5:-1]
-            title = title[:-6].strip()
+        if re.search('\([0-9][0-9][0-9][0-9]\)$', m['title']):
+            title_year = m['title'][-5:-1]
+            m['title'] = m['title'][:-6].strip()
             params['year'] = title_year
 
-        # get media dict from themoviedb, sleep due to api rate limit
-        params['query'] = title
+        # lookup media dict from themoviedb, sleep due to api rate limit
+        params['query'] = m['title']
         time.sleep(0.2)
         search_type = 'movie' if mtype == 'movie' else 'tv'
         search = requests.get(tmdb_url+search_type, params=params).json()
@@ -339,62 +360,55 @@ def get_medias_from_titles(titles, mtype):
 
         # exit iteration if search not complete or no results
         if 'total_results' not in search:
-            logging.error('tmdb search not complete ' + mtype + ': ' + title)
+            logging.error('tmdb search not complete ' + mtype + ': ' + m['title'])
             continue
         if search['total_results'] < 1:
-            logging.warning('tmdb 0 results for ' + mtype + ': ' + title)
+            logging.warning('tmdb 0 results for ' + mtype + ': ' + m['title'])
             continue
 
         # append data so dict can be saved to database
-        m = search['results'][0]
-        m['mtype'] = mtype
-        m['sources'] = []
+        full_media = search['results'][0]
+        full_media['mtype'] = mtype
+        full_media['sources'] = []
         if mtype == 'movie':
-            m['year'] = m['release_date'][:4]
+            full_media['year'] = full_media['release_date'][:4]
         else:
-            m['title'] = m['name']
-            m['year'] = m['first_air_date'][:4]
-
-        # build medias dictionary
-        medias.append(m)
-        logging.info('tmdb found ' + mtype + ': ' + title)
+            full_media['title'] = full_media['name']
+            full_media['year'] = full_media['first_air_date'][:4]
+        logging.info('tmdb found ' + mtype + ': ' + full_media['title'])
 
         # check if titles are not exact match, in future may not append these
-        t1 = title.translate({ord(c): None for c in "'’:"})
-        t2 = m['title'].translate({ord(c): None for c in "'’:"})
+        t1 = m['title'].translate({ord(c): None for c in "'’:"})
+        t2 = full_media['title'].translate({ord(c): None for c in "'’:"})
         if t1.lower().replace('&', 'and') != t2.lower().replace('&', 'and'):
-            logging.warning('not exact titles: ' + title + ' | ' + m['title'])
-    return medias
+            logging.warning('not exact titles: ' +
+                            full_media['title'] + ' | ' + m['title'])
 
+        # write db media if new
+        if not db.Media.find_one({'mtype': full_media['mtype'], 'id': full_media['id']}):
+            db.Media.insert_one(full_media)
+            logging.info('db wrote new media: ' + full_media['title'])
 
-def medias_to_db_with_source(medias, source):
-    db = pymongo.MongoClient('localhost', 27017).MediaData
+        # update source with specific media link, if available
+        source_to_write = dict(source)
+        if 'link' in m.keys():
+            source_to_write['link'] = m['link']
 
-    # write db media if new
-    for m in medias:
-        if not db.Media.find_one({'mtype': m['mtype'], 'id': m['id']}):
-            db.Media.insert_one(m)
-            logging.info('db wrote new media: ' + m['title'])
-
-    # update db media with source
-    for m in medias:
-        db_media = db.Media.find_one({'mtype': m['mtype'], 'id': m['id']})
-        if source not in db_media['sources']:
-            db.Media.find_one_and_update({'mtype': m['mtype'], 'id': m['id']},
-                {'$push': {'sources': source}})
-            logging.info(source['source'] + ' added for: ' + m['title'])
-
-    ''' example scrape: clear database, get 800 sho titles then tmdb media,
-    see none in db, append 'mtype' and add, then add source to all
-    now get 500 hbo, for the 100 overlap it will not add to db, 400 will add
-    now add source to all 500 '''
+        # update db media with source
+        db_media = db.Media.find_one({'mtype': full_media['mtype'],
+                                      'id': full_media['id']})
+        if (db_media and not any(source['name'] in
+                d.values() for d in db_media['sources'])):
+            db.Media.find_one_and_update({'mtype': full_media['mtype'],
+                                          'id': full_media['id']},
+                {'$push': {'sources': source_to_write}})
+            logging.info(source['name'] + ' added for: ' + full_media['title'])
 
     ''' one-time db statements: create/view indexes, del all docs in col '''
     # db.Media.create_index([('mtype', pymongo.ASCENDING), ('id', pymongo.ASCENDING)])
     # print sorted(list(db.Shows.index_information()))
     # print db.Media.delete_many({})  # delete all shows in database
     # print db.Media.count()
-    # import q; q.d()
 
 
 if __name__ == "__main__":

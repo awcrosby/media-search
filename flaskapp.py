@@ -235,30 +235,13 @@ def watchlist():
 
     wl_detail = []
     for item in user['watchlist']:
-        if ('email' in session) and session['email'] == 'dale@coop.com':
-            m = requests.get(api.url_for(Media2, mtype=item['mtype'],
-                                         mid=int(item['id']), _external=True))
-            if m:  # TODO apiv2.0 for this user
-                m = json.loads(m.json())
-                m['themoviedb'] = m['id']
-                wl_detail.append(m)
-            else:  # if api did not return data for the item
-                item['title'] += '*'
-                item['themoviedb'] = item['id']
-                wl_detail.append(item)
-
-        else:
-            m = requests.get(api.url_for(Media, mtype=item['mtype'],
-                                         mid=int(item['id']), _external=True))
-            if m:
-                m = json.loads(m.json())
-                m = add_src_display(m, item['mtype'])
-                m['mtype'] = item['mtype']
-                wl_detail.append(m)
-            else:  # if api did not return data for the item
-                item['title'] += '*'
-                item['themoviedb'] = item['id']
-                wl_detail.append(item)
+        m = requests.get(api.url_for(Media2, mtype=item['mtype'],
+                                     mid=int(item['id']), _external=True))
+        if m.status_code == 200:
+            m = json.loads(m.json())
+            wl_detail.append(m)
+        else:  # if api did not return data for the item
+            wl_detail.append(item)
 
     print 'time to get media of full watchlist: ', time.time() - start
     return render_template('watchlist.html', medias=wl_detail, mtype=mtype)
@@ -289,13 +272,17 @@ def search(mtype='movie', query=''):
     if mtype == 'movie' or mtype == 'all':
         mv = requests.get(tmdb_url+'movie', params=params).json()
         pop_after_first = [m for m in mv['results'][1:]
-                           if m['vote_count'] >= 20 or m['popularity'] > 10]
-        mv['results'] = [mv['results'][0]] + pop_after_first
+                           if m['vote_count'] >= 10 or m['popularity'] > 10]
+        mv['results'] = [m for m in mv['results'][:1]] + pop_after_first
+        mv['results'] = [m for m in mv['results'] if m['release_date']]
+        mv['results'] = [m for m in mv['results'] if m['poster_path']]
     if mtype == 'show' or mtype == 'all':
         sh = requests.get(tmdb_url+'tv', params=params).json()
         pop_after_first = [m for m in sh['results'][1:]
-                           if m['vote_count'] >= 20 or m['popularity'] > 10]
-        sh['results'] = [sh['results'][0]] + pop_after_first
+                           if m['vote_count'] >= 10 or m['popularity'] > 10]
+        sh['results'] = [m for m in sh['results'][:1]] + pop_after_first
+        sh['results'] = [m for m in sh['results'] if m['first_air_date']]
+        sh['results'] = [m for m in sh['results'] if m['poster_path']]
 
     # if neither have results render template without sending media
     if (len(mv['results']) + len(sh['results']) == 0):
@@ -335,18 +322,11 @@ def mediainfo(mtype='movie', mid=None):
         summary['title'] = summary['name']
         summary['year'] = summary['first_air_date'][:4]
 
-    # local api request and add display sources
-    media = requests.get(api.url_for(Media, mtype=mtype,
+    # local api request to check for sources
+    media = requests.get(api.url_for(Media2, mtype=mtype,
                                      mid=mid, _external=True))
     if media.status_code == 200:
         media = json.loads(media.json())
-        media = add_src_display(media, mtype)
-
-    if ('email' in session) and session['email'] == 'dale@coop.com':
-        media = requests.get(api.url_for(Media2, mtype=mtype,
-                                         mid=mid, _external=True))
-        if media.status_code == 200:
-            media = json.loads(media.json())
 
     return render_template('mediainfo.html', media=media,
                            mtype=mtype, summary=summary)
