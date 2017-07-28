@@ -24,11 +24,11 @@ def main():
                         level=logging.INFO)
     requests_cache.install_cache('demo_cache')
 
-    search_hbo()
+    #search_hbo()
     #search_showtime()
     #search_netflix()
     #search_hulu()
-
+    remove_hulu_addon_media()
 
 def search_hulu():
     # source dict to be added to media sources[] in db for found titles
@@ -39,6 +39,7 @@ def search_hulu():
 
     # go to hulu splash page
     driver = webdriver.PhantomJS()
+    driver.implicitly_wait(10)  # seconds
     driver.set_window_size(1920, 1080)
     driver.get('https://www.hulu.com')
     time.sleep(1.2)
@@ -81,46 +82,101 @@ def search_hulu():
     all_genre = driver.find_element_by_id('all_movies_genres')
     anchors = all_genre.find_elements_by_class_name('beacon-click')
     genre_pages = [a.get_attribute('href') for a in anchors]
-    print 'genre_pages:', genre_pages
     logging.info('hulu, got movie genres')
-    #import q; q.d()
 
-    media = []
-    for page in genre_pages[:2]:
+    medias = []
+    for page in genre_pages:
         # get page and pointer to top panel, holding about 6 medias
-        driver.get(page)
-        logging.info('did GET on: ' + page)
-        time.sleep(3)
-        top_panel = driver.find_elements_by_class_name('tray')[0]
-        next_btn = top_panel.find_element_by_class_name('next')
+        try:
+            logging.info('about to get page: ' + page)
+            driver.get(page)
+            time.sleep(6)
+            top_panel = driver.find_element_by_class_name('tray')
+            next_btn = top_panel.find_element_by_class_name('next')
+        except Exception as e:
+            logging.exception('initial load of genre_page')
+            pass
 
+        # get visible media, click next, repeat until no next button
         while True:
-            thumbnails = top_panel.find_elements_by_class_name('row')
-            for t in thumbnails:
-                try:
+            try:
+                thumbnails = top_panel.find_elements_by_class_name('row')
+                for t in thumbnails:
                     title = t.find_element_by_class_name('title')
                     title = title.get_attribute('innerHTML')
                     link = t.find_element_by_class_name('beacon-click')
                     link = link.get_attribute('href')
-                    media += [{'title': title, 'link': link}]
-                except Exception as err:
-                    logging.error(err.message)
-                    pass
-            # exit loop if next button is not displayed, otherwise click/wait
-            if not next_btn.is_displayed():
-                break
-            next_btn.click()
-            time.sleep(float(random.randrange(1500, 2000, 1))/1000)
-        logging.info(str(len(media)) + ' len(media) for page: ' + page)
-
-    # list of dict into list of tuples, take unique set, then back to dict
-    media = [dict(t) for t in set([tuple(d.items()) for d in media])]
+                    medias += [{'title': title, 'link': link}]
+                if not next_btn.is_displayed():
+                    break  # exit loop if next button is not displayed
+                next_btn.click()
+                time.sleep(float(random.randrange(1800, 2300, 1))/1000)
+            except Exception as e:
+                logging.exception('processing thumbnails of media')
+                pass
+        logging.info('len(medias) so far: ' + str(len(medias)))
 
     import q; q.d()
+    lookup_and_write_medias(medias, mtype='movie', source=source)
+
+
+    # SHOW SEARCH SECTION
+    # get all show genres
+    driver.get('https://www.hulu.com/tv/genres')
+    time.sleep(1.5)
+    all_genre = driver.find_element_by_id('all_tv_genres')
+    anchors = all_genre.find_elements_by_class_name('beacon-click')
+    genre_pages = [a.get_attribute('href') for a in anchors]
+    logging.info('hulu, got tv genres')
+
+    medias = []
+    for page in genre_pages:
+        if page == 'https://www.hulu.com/videogames':
+            continue
+        # get page and pointer to top panel, holding about 6 medias
+        try:
+            logging.info('about to get page: ' + page)
+            driver.get(page)
+            time.sleep(6)
+            top_panel = driver.find_element_by_class_name('tray')
+            next_btn = top_panel.find_element_by_class_name('next')
+        except Exception as e:
+            logging.exception('initial load of genre_page')
+            pass
+
+        # get visible media, click next, repeat until no next button
+        while True:
+            try:
+                thumbnails = top_panel.find_elements_by_class_name('row')
+                for t in thumbnails:
+                    title = t.find_element_by_class_name('title')
+                    title = title.get_attribute('innerHTML')
+                    link = t.find_element_by_class_name('beacon-click')
+                    link = link.get_attribute('href')
+                    medias += [{'title': title, 'link': link}]
+                if not next_btn.is_displayed():
+                    break  # exit loop if next button is not displayed
+                next_btn.click()
+                time.sleep(float(random.randrange(1800, 2300, 1))/1000)
+            except Exception as e:
+                logging.exception('processing thumbnails of media')
+                pass
+        logging.info('len(medias) so far: ' + str(len(medias)))
+
+    import q; q.d()
+    lookup_and_write_medias(medias, mtype='show', source=source)
     driver.quit()
 
-    # put source into beautifulsoup and get titles
-    #soup = BeautifulSoup(driver.page_source, 'html.parser')
+
+def remove_hulu_addon_media():
+    '''on browse of hulu, for media requiring addons (i.e. showtime)
+    it does not denote this in html (only in an img), so any overlaps
+    with both sources will remove hulu as a source'''
+
+    db = pymongo.MongoClient('localhost', 27017).MediaData
+    x = db.Media.update_many({'sources.name': {'$all': ['hulu', 'showtime']}},
+                         {'$pull': {'sources': {'name': 'hulu'}}})
+    logging.info('hulu removed from {0!s} db docs'.format(x.matched_count))
 
 
 def search_netflix():
@@ -133,6 +189,7 @@ def search_netflix():
 
     # log in to provider
     driver = webdriver.PhantomJS()
+    driver.implicitly_wait(10)  # seconds
     driver.set_window_size(1920, 1080)
     driver.get('https://www.netflix.com/login')
     inputs = driver.find_elements_by_tag_name('input')

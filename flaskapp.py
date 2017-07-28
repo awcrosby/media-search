@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 from flask import (Flask, render_template, request, redirect,
                    url_for, flash, session, abort)
 from flask_restful import Resource, Api, reqparse
@@ -12,8 +13,10 @@ import datetime
 import requests
 from wtforms import Form, StringField, PasswordField, validators
 from passlib.hash import sha256_crypt
-from shared_func import add_src_display
 from functools import wraps
+import bottlenose as BN  # amazon product api wrapper
+from bs4 import BeautifulSoup
+from provider_search import lookup_and_write_medias
 app = Flask(__name__)
 api = Api(app)
 
@@ -136,19 +139,6 @@ def logout():
 class Media(Resource):
     def get(self, mtype, mid):
         db = pymongo.MongoClient('localhost', 27017).MediaData
-        if mtype == 'movie':
-            media = db.Movies.find_one({'themoviedb': mid})
-        else:
-            media = db.Shows.find_one({'themoviedb': mid})
-        if not media:
-            return '', 404
-        return dumps(media), 200  # pymongo BSON conversion to json
-
-
-# local api media interaction
-class Media2(Resource):
-    def get(self, mtype, mid):
-        db = pymongo.MongoClient('localhost', 27017).MediaData
         media = db.Media.find_one({'mtype': mtype, 'id': mid})
         if not media:
             return '', 404
@@ -189,10 +179,9 @@ class WlistItem(Resource):
         return '', 204
 
 # set up api resource routing, TODO add auth on POST and DELETE requests
-api.add_resource(Media, '/apiv1.0/<mtype>/<int:mid>')
-api.add_resource(Media2, '/apiv2.0/<mtype>/<int:mid>')
-api.add_resource(Wlist, '/apiv1.0/watchlist')
-api.add_resource(WlistItem, '/apiv1.0/watchlist/<mtype>/<int:mid>/<email>')
+api.add_resource(Media, '/apiv1.1/<mtype>/<int:mid>')
+api.add_resource(Wlist, '/apiv1.1/watchlist')
+api.add_resource(WlistItem, '/apiv1.1/watchlist/<mtype>/<int:mid>/<email>')
 
 
 # route to allow python to make HTTP DELETE request
@@ -235,7 +224,7 @@ def watchlist():
 
     wl_detail = []
     for item in user['watchlist']:
-        m = requests.get(api.url_for(Media2, mtype=item['mtype'],
+        m = requests.get(api.url_for(Media, mtype=item['mtype'],
                                      mid=int(item['id']), _external=True))
         if m.status_code == 200:
             m = json.loads(m.json())
@@ -322,8 +311,11 @@ def mediainfo(mtype='movie', mid=None):
         summary['title'] = summary['name']
         summary['year'] = summary['first_air_date'][:4]
 
+    # check if this title/year avail on amz and write to db
+    check_add_amz_source(summary['title'], summary['year'], mtype)
+
     # local api request to check for sources
-    media = requests.get(api.url_for(Media2, mtype=mtype,
+    media = requests.get(api.url_for(Media, mtype=mtype,
                                      mid=mid, _external=True))
     if media.status_code == 200:
         media = json.loads(media.json())
@@ -331,6 +323,54 @@ def mediainfo(mtype='movie', mid=None):
     return render_template('mediainfo.html', media=media,
                            mtype=mtype, summary=summary)
 
+def check_add_amz_source(title, year, mtype):
+    '''Non-Amz approach: scrape title then search themoviedb for 1st result
+       ok because its searching in ~all media ever
+       Amz: themoviedb title to search amz 1st result not ok: any Terminator
+       movie title yields Genisys, so check if title/year exact match'''
+
+    # prepare for amz api search
+    k = json.loads(open('apikeys.json').read())
+    amz = BN.Amazon(k['amz_access'], k['amz_secret'],k['amz_associate_tag'])
+    # https://github.com/lionheart/bottlenose/blob/master/README.md
+
+    # search amz with themoviedb title
+    if mtype == 'movie':
+        results = amz.ItemSearch(SearchIndex='Movies',
+            ResponseGroup='ItemAttributes',  #type of response
+            BrowseNode='2676882011',  # product type of prime video
+            Title=title)
+        soup = BeautifulSoup(results, "xml")
+        if not soup.find('Item'):
+            logging.info('amazon api - no results found')
+            return
+        amz_title = soup.find('Item').find('Title').text  # title of first result
+        # amz_year = soup.find('Item').find('ReleaseDate').text[0:4]  # not always populated
+    else:
+        return
+        results = amz.ItemSearch(SearchIndex='Movies',
+            ResponseGroup='ItemAttributes,RelatedItems',  #type of response
+            BrowseNode='2676882011',  # product type of prime video
+            RelationshipType='Episode',  # necessary to get show title
+            Title=tmdb_title)
+
+    # clean title strings and compare, if title and year match, it is a match
+    t1 = title.translate({ord(c): None for c in "'’:"})
+    t1 = t1.lower().replace('&', 'and')
+    t2 = amz_title.translate({ord(c): None for c in "'’:"})
+    t2 = t2.lower().replace('&', 'and')
+    if t1 != t2: # and year == amz_year:  # exit if titles don't match
+        logging.info('amazon api - no title match')
+        return
+
+    # append amazon source
+    logging.info('amazon api - found title match')
+    source = {'name': 'amazon',
+              'display_name': 'Amazon',
+              'link': 'http://www.amazon.com',
+              'type': 'subscription_web_sources'}
+    media = {'title': title, 'link': soup.find('Item').find('DetailPageURL').text}
+    lookup_and_write_medias([media], mtype, source)
 
 if __name__ == "__main__":
     app.secret_key = '3d6gtrje6d2rffe2jqkv'

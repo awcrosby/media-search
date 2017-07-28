@@ -33,11 +33,7 @@
     <!-- display sources if found -->
     {% if not media or not media['sources'] %}
         <div class="clearfix" style="margin-top: 20px; color: red">
-          {% if media['_id'] %}  <!-- media came from the database -->
-              There are no streaming sources for this {{ mtype }}
-          {% else %}
-              We do not have infomation about this {{ mtype }}
-          {% endif %}
+          There are no streaming sources for this {{ mtype }}
         </div>
     {% elif media and media['sources'] %}
         <div class="clearfix" style="margin-top: 20px"></div>
