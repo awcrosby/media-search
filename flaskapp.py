@@ -253,8 +253,8 @@ def search(mtype='movie', query=''):
         'api_key': json.loads(open('apikeys.json').read())['tmdb'],
         'query': query
     }
-    logging.info('user query: ' + query + mtype)
-    print 'user query:', query, mtype
+    logging.info('user query, {}: {}'.format(mtype, query))
+    print 'user query, {}: {}'.format(mtype, query)
 
     # search via themoviedb api, take first result and any pop others
     mv, sh, mv['results'], sh['results'] = ({}, {}, [], [])
@@ -339,28 +339,41 @@ def check_add_amz_source(title, year, mtype):
         results = amz.ItemSearch(SearchIndex='Movies',
             ResponseGroup='ItemAttributes',  #type of response
             BrowseNode='2676882011',  # product type of prime video
-            Title=title)
-        soup = BeautifulSoup(results, "xml")
-        if not soup.find('Item'):
-            logging.info('amazon api - no results found')
-            return
-        amz_title = soup.find('Item').find('Title').text  # title of first result
-        # amz_year = soup.find('Item').find('ReleaseDate').text[0:4]  # not always populated
+            Keywords=title)  # option to use Title, but saw Spectre bad date
     else:
-        return
         results = amz.ItemSearch(SearchIndex='Movies',
             ResponseGroup='ItemAttributes,RelatedItems',  #type of response
             BrowseNode='2676882011',  # product type of prime video
             RelationshipType='Episode',  # necessary to get show title
-            Title=tmdb_title)
+            Title=title)  #  Keywords option, but had 'commentary' in title
+
+    # ensure results not empty and release data is present
+    soup = BeautifulSoup(results, "xml")
+    if int(soup.find('TotalResults').text) == 0:
+        logging.info('amazon api - no results found')
+        return
+
+    # get title from first result, option to get year also, see notes below
+    if mtype == 'movie':
+        if not soup.find('Item').find('ReleaseDate'):
+            logging.info('amazon api - no release year in top result')
+            return  # likely means this result is obscure
+        amz_title = soup.find('Item').find('Title').text  # title of 1st result
+    else:  # note: seems difficult to get show's very first release date
+        if not len(soup.find('Item').find_all('Title')) > 1:
+            logging.info('amazon api - show title not found')
+            return
+        amz_title = soup.find('Item').find_all('Title')[1].text
+        pos_season = amz_title.find('Season') - 1
+        amz_title = amz_title[:pos_season]
 
     # clean title strings and compare, if title and year match, it is a match
     t1 = title.translate({ord(c): None for c in "'’:"})
     t1 = t1.lower().replace('&', 'and')
     t2 = amz_title.translate({ord(c): None for c in "'’:"})
     t2 = t2.lower().replace('&', 'and')
-    if t1 != t2: # and year == amz_year:  # exit if titles don't match
-        logging.info('amazon api - no title match')
+    if t1 != t2:
+        logging.info('amazon api, no match: {}, {}'.format(t1, t2))
         return
 
     # append amazon source
