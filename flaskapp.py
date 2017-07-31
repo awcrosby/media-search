@@ -329,6 +329,14 @@ def check_add_amz_source(title, year, mtype):
        Amz: themoviedb title to search amz 1st result not ok: any Terminator
        movie title yields Genisys, so check if title/year exact match'''
 
+    '''search amz for "Where The Red Fern Grows" it has 2003 as top result,
+            themoviedb is 1974, mismatch
+       search amz for "Where The Red Fern Grows 1974" it matches
+       search amz for "Clear and Present Danger 1994" yields no results
+       search amz for "Clear and Present Danger" it matches
+            also "Chaos", "The Assignment"... amz has many date issues either
+            mismatch or uses date of a re-release in ItemSearch results'''
+
     # prepare for amz api search
     k = json.loads(open('apikeys.json').read())
     amz = BN.Amazon(k['amz_access'], k['amz_secret'],k['amz_associate_tag'],
@@ -336,14 +344,16 @@ def check_add_amz_source(title, year, mtype):
     # https://github.com/lionheart/bottlenose/blob/master/README.md
 
     # search amz with themoviedb title
+    # option to use Title instead of Keywords, but saw Spectre bad date
     if mtype == 'movie':
         results = amz.ItemSearch(SearchIndex='Movies',
-            ResponseGroup='ItemAttributes',  #type of response
+            ResponseGroup='ItemAttributes',  # type of response
             BrowseNode='2676882011',  # product type of prime video
-            Keywords=title)  # option to use Title, but saw Spectre bad date
+            #Keywords='{} {}'.format(title, year))  # too many year mismatches
+            Keywords='{}'.format(title))
     else:
         results = amz.ItemSearch(SearchIndex='Movies',
-            ResponseGroup='ItemAttributes,RelatedItems',  #type of response
+            ResponseGroup='ItemAttributes,RelatedItems',  # type of response
             BrowseNode='2676882011',  # product type of prime video
             RelationshipType='Episode',  # necessary to get show title
             Title=title)  #  Keywords option, but had 'commentary' in title
@@ -354,12 +364,14 @@ def check_add_amz_source(title, year, mtype):
         logging.info('amazon api - no results found')
         return
 
-    # get title from first result, option to get year also, see notes below
+    # get title from first result
     if mtype == 'movie':
         if not soup.find('Item').find('ReleaseDate'):
             logging.info('amazon api - no release year in top result')
             return  # likely means this result is obscure
         amz_title = soup.find('Item').find('Title').text  # title of 1st result
+        amz_year = soup.find('Item').find('ReleaseDate').text[:4]
+        print 'themoviedb: {}, amazon: {}'.format(year, amz_year)
     else:  # note: seems difficult to get show's very first release date
         if not len(soup.find('Item').find_all('Title')) > 1:
             logging.info('amazon api - show title not found')
@@ -367,6 +379,7 @@ def check_add_amz_source(title, year, mtype):
         amz_title = soup.find('Item').find_all('Title')[1].text
         pos_season = amz_title.find('Season') - 1
         amz_title = amz_title[:pos_season]
+        amz_title = amz_title.rstrip('- ')
 
     # clean title strings and compare, if title and year match, it is a match
     t1 = title.translate({ord(c): None for c in "'’:"})
