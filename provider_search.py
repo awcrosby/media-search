@@ -12,6 +12,7 @@ import time
 import random
 import logging
 from selenium import webdriver
+import flaskapp
 
 '''provider_search.py goes to media providers to
     search for media availability and write to db''' 
@@ -28,7 +29,31 @@ def main():
     #search_showtime()
     #search_netflix()
     #search_hulu()
-    remove_hulu_addon_media()
+    #remove_hulu_addon_media()
+    update_watchlist_amz()
+
+
+def update_watchlist_amz():
+    '''searches every watchlist media and checks if amazon is a source
+    and if so adds to database'''
+
+    # get list of all watchlist unique media
+    db = pymongo.MongoClient('localhost', 27017).MediaData
+    wl_cur = db.Users.find({}, {'_id':0, 'watchlist': 1})
+    wl_all = []
+    for wl in wl_cur:
+        wl_all += wl['watchlist']
+    print 'len(wl_all):', len(wl_all)
+    wl_unique = [dict(t) for t in set([tuple(d.items()) for d in wl_all])]
+    print 'len(wl_unique):', len(wl_unique)
+
+    # send each media to check_add_amz_source with sleep for api limit
+    for m in wl_unique:
+        flaskapp.check_add_amz_source(m['title'], m['year'], m['mtype'])
+        time.sleep(1.1)
+
+    return
+
 
 def search_hulu():
     # source dict to be added to media sources[] in db for found titles

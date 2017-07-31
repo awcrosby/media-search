@@ -16,7 +16,7 @@ from passlib.hash import sha256_crypt
 from functools import wraps
 import bottlenose as BN  # amazon product api wrapper
 from bs4 import BeautifulSoup
-from provider_search import lookup_and_write_medias
+import provider_search
 app = Flask(__name__)
 api = Api(app)
 
@@ -331,7 +331,8 @@ def check_add_amz_source(title, year, mtype):
 
     # prepare for amz api search
     k = json.loads(open('apikeys.json').read())
-    amz = BN.Amazon(k['amz_access'], k['amz_secret'],k['amz_associate_tag'])
+    amz = BN.Amazon(k['amz_access'], k['amz_secret'],k['amz_associate_tag'],
+          MaxQPS=2)
     # https://github.com/lionheart/bottlenose/blob/master/README.md
 
     # search amz with themoviedb title
@@ -383,7 +384,7 @@ def check_add_amz_source(title, year, mtype):
               'link': 'http://www.amazon.com',
               'type': 'subscription_web_sources'}
     media = {'title': title, 'link': soup.find('Item').find('DetailPageURL').text}
-    lookup_and_write_medias([media], mtype, source)
+    provider_search.lookup_and_write_medias([media], mtype, source)
 
 if __name__ == "__main__":
     app.secret_key = '3d6gtrje6d2rffe2jqkv'
