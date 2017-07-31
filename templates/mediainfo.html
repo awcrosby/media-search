@@ -14,6 +14,9 @@
             <div><strong>{{ summary['title'] }} ({{ summary['year'] }})</strong></div>
             {% if mtype == 'show' %}
                 <div><em>{{ summary['number_of_seasons'] }} seasons, {{ summary['number_of_episodes'] }} episodes</em></div>
+                <div><a href={{ 'https://www.themoviedb.org/tv/{}'.format(summary['id']) }}>TheMovieDB</a></div>
+            {% else %}
+                <div><a href={{ 'https://www.themoviedb.org/movie/{}'.format(summary['id']) }}>TheMovieDB</a></div>
             {% endif %}
             <div>{{ summary['overview'] }}</div>
             {% if session.logged_in %}
@@ -40,7 +43,7 @@
         {% for s in media['sources'] %}
             <!-- display logo or title in source boxes -->
             <div class="source">
-              {% if s['name'] in ['netflix', 'hulu', 'amazon_prime', 'hbo', 'showtime'] %}
+              {% if s['name'] in ['netflix', 'hulu', 'amazon', 'hbo', 'showtime'] %}
                   <img class="logo" src="{{ url_for('static', filename=s['name']+'_logo.png') }}" alt="Subscription logo" />
               {% elif s['type'] == 'subscription_web_sources' %}
                   <div class="typefree">Stream with Subscription</div>

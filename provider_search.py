@@ -511,11 +511,12 @@ def lookup_and_write_medias(medias, mtype, source):
             logging.info(source['name'] + ' added for: ' + full_media['title'])
 
     ''' one-time db statements: create/view indexes, del all docs in col '''
-    # db.Media.create_index([('mtype', pymongo.ASCENDING), ('id', pymongo.ASCENDING)])
+    # db.Media.create_index(
+    #   [('mtype', pymongo.ASCENDING), ('id', pymongo.ASCENDING)], unique=True)
     # print sorted(list(db.Shows.index_information()))
     # print db.Media.delete_many({})  # delete all shows in database
     # print db.Media.count()
-
+    # can run db.Media.reindex() after every purge/scrape
 
 if __name__ == "__main__":
     main()
