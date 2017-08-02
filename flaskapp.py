@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from flask import (Flask, render_template, request, redirect,
-                   url_for, flash, session, abort)
+                   url_for, flash, session, abort, jsonify)
 from flask_restful import Resource, Api, reqparse
 from bson.json_util import dumps
 import json
@@ -18,7 +18,9 @@ import bottlenose as BN  # amazon product api wrapper
 from bs4 import BeautifulSoup
 import provider_search
 app = Flask(__name__)
+#app.config['TESTING'] = True
 api = Api(app)
+db = pymongo.MongoClient('localhost', 27017).MediaData
 
 '''webframework flaskapp high-level functionality:
     user search query via themoviedb api, results with links to specific media
@@ -119,7 +121,7 @@ def login():
                 session['logged_in'] = True
                 session['email'] = email
                 flash('You are now logged in', 'success')
-                return redirect(url_for('watchlist'))
+                return redirect(url_for('display_watchlist'))
             else:
                 return render_template('login.html', error='Invalid login')
         else:
@@ -135,72 +137,10 @@ def logout():
     return redirect(url_for('login'))
 
 
-# local api media interaction
-class Media(Resource):
-    def get(self, mtype, mid):
-        db = pymongo.MongoClient('localhost', 27017).MediaData
-        media = db.Media.find_one({'mtype': mtype, 'id': mid})
-        if not media:
-            return '', 404
-        return dumps(media), 200  # pymongo BSON conversion to json
-
-
-# local api, watchlist, GET all or POST one
-class Wlist(Resource):
-    def get(self):
-        db = pymongo.MongoClient('localhost', 27017).MediaData
-        email = session['email']
-        user = db.Users.find_one({'email': email})
-        return user['watchlist']
-    def post(self):
-        db = pymongo.MongoClient('localhost', 27017).MediaData
-
-        # check if media already in watchlist and if so exit
-        user = db.Users.find_one({'email': request.form['email']})
-        all_mids = [w['id'] for w in user['watchlist']
-                   if w['mtype'] == request.form['mtype']]
-        if int(request.form['mid']) in all_mids:
-            return '', 404
-
-        # add to user's watchlist
-        db.Users.find_one_and_update({'email': request.form['email']},
-          {'$push': {'watchlist':
-            {'id': int(request.form['mid']), 'mtype': request.form['mtype'],
-             'title': request.form['title'], 'year': request.form['year']}}})
-        return '', 204
-
-
-# local api, watchlist, DELETE one
-class WlistItem(Resource):
-    def delete(self, mtype, mid, email):
-        db = pymongo.MongoClient('localhost', 27017).MediaData
-        db.Users.find_one_and_update({'email': email},
-            {'$pull': {'watchlist': {'mtype': mtype, 'id': mid}}})
-        return '', 204
-
-# set up api resource routing, TODO add auth on POST and DELETE requests
-api.add_resource(Media, '/apiv1.1/<mtype>/<int:mid>')
-api.add_resource(Wlist, '/apiv1.1/watchlist')
-api.add_resource(WlistItem, '/apiv1.1/watchlist/<mtype>/<int:mid>/<email>')
-
-
-# route to allow python to make HTTP DELETE request
-@app.route('/watchlist/delete/<mtype>/<int:mid>', methods=['GET'])
-@is_logged_in
-def delFromWatchlist(mtype=None, mid=None):
-    response = requests.delete(api.url_for(WlistItem, mtype=mtype,
-                 mid=mid, _external=True, email=session['email']))
-    if response.status_code == 204:
-        flash('Item deleted from watchlist', 'success')
-    else:
-        flash('Item not deleted from watchlist', 'danger')
-    return redirect(url_for('watchlist'))
-    
-
 # GET display user's watchlist, or POST new item to watchlist
 @app.route('/watchlist', methods=['GET', 'POST'])
 @is_logged_in
-def watchlist():
+def display_watchlist():
     if request.method == 'POST':
         response = requests.post(api.url_for(Wlist, _external=True),
             data={
@@ -213,11 +153,11 @@ def watchlist():
             flash('Item already in watchlist', 'danger')
         else:
             flash('Item not added to watchlist', 'danger')
-        return redirect(url_for('watchlist'))
+        return redirect(url_for('display_watchlist'))
         
     mtype = request.args.get('mtype')  # retains search dropdown value
 
-    # connect to db and get user
+    # connect to db and get user     TODO use api here
     start = time.time()
     db = pymongo.MongoClient('localhost', 27017).MediaData
     user = db.Users.find_one({'email': session['email']})
@@ -231,6 +171,8 @@ def watchlist():
             wl_detail.append(m)
         else:  # if api did not return data for the item
             wl_detail.append(item)
+
+        #wl_detail.append(item)
 
     print 'time to get media of full watchlist: ', time.time() - start
     return render_template('watchlist.html', medias=wl_detail, mtype=mtype)
@@ -323,6 +265,7 @@ def mediainfo(mtype='movie', mid=None):
     return render_template('mediainfo.html', media=media,
                            mtype=mtype, summary=summary)
 
+
 def check_add_amz_source(title, year, mtype):
     '''Non-Amz approach: scrape title then search themoviedb for 1st result
        ok because its searching in ~all media ever
@@ -399,6 +342,80 @@ def check_add_amz_source(title, year, mtype):
     media = {'title': title, 'link': soup.find('Item').find('DetailPageURL').text}
     provider_search.lookup_and_write_medias([media], mtype, source)
 
+
+# route to allow browser click to make HTTP DELETE request
+@app.route('/watchlist/delete/<mtype>/<int:mid>', methods=['GET'])
+@is_logged_in
+def delFromWatchlist(mtype=None, mid=None):
+    response = requests.delete(api.url_for(WlistItem, mtype=mtype,
+                 mid=mid, _external=True, email=session['email']))
+    if response.status_code == 204:
+        flash('Item deleted from watchlist', 'success')
+    else:
+        flash('Item not deleted from watchlist', 'danger')
+    return redirect(url_for('display_watchlist'))
+
+
+'''Local API Section'''
+class Media(Resource):
+    def get(self, mtype, mid):
+        media = db.Media.find_one({'mtype': mtype, 'id': mid})
+        if not media:
+            return '', 404
+        return dumps(media), 200  # pymongo BSON conversion to json
+    # TODO create a POST here
+    # TODO create a PUT here to update source new or update active=False
+
+
+class User(Resource):
+    decorators = [is_logged_in]
+    def get(self):
+        user = db.Users.find_one({'email': session['email']})
+        if not user:
+            return '', 404
+        return dumps(user), 200
+
+
+# local api, watchlist, GET all or POST one
+class Wlist(Resource):
+    def get(self):
+        db = pymongo.MongoClient('localhost', 27017).MediaData
+        email = session['email']
+        user = db.Users.find_one({'email': email})
+        return user['watchlist']
+    def post(self):
+        db = pymongo.MongoClient('localhost', 27017).MediaData
+
+        # check if media already in watchlist and if so exit
+        user = db.Users.find_one({'email': request.form['email']})
+        all_mids = [w['id'] for w in user['watchlist']
+                   if w['mtype'] == request.form['mtype']]
+        if int(request.form['mid']) in all_mids:
+            return '', 404
+
+        # add to user's watchlist
+        db.Users.find_one_and_update({'email': request.form['email']},
+          {'$push': {'watchlist':
+            {'id': int(request.form['mid']), 'mtype': request.form['mtype'],
+             'title': request.form['title'], 'year': request.form['year']}}})
+        return '', 204
+
+
+# local api, watchlist, DELETE one
+class WlistItem(Resource):
+    def delete(self, mtype, mid, email):
+        db = pymongo.MongoClient('localhost', 27017).MediaData
+        db.Users.find_one_and_update({'email': email},
+            {'$pull': {'watchlist': {'mtype': mtype, 'id': mid}}})
+        return '', 204
+
+# set up api resource routing, TODO add auth on POST and DELETE requests
+api.add_resource(Media, '/api/<mtype>/<int:mid>')
+api.add_resource(User, '/api/user')
+api.add_resource(Wlist, '/api/watchlist')
+api.add_resource(WlistItem, '/api/watchlist/<mtype>/<int:mid>/<email>')
+
+
 if __name__ == "__main__":
     app.secret_key = '3d6gtrje6d2rffe2jqkv'
-    app.run(debug=True, host='0.0.0.0', port=8181)
+    app.run(host='0.0.0.0', port=8181)
