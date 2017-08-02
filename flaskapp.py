@@ -18,7 +18,6 @@ import bottlenose as BN  # amazon product api wrapper
 from bs4 import BeautifulSoup
 import provider_search
 app = Flask(__name__)
-#app.config['TESTING'] = True
 api = Api(app)
 db = pymongo.MongoClient('localhost', 27017).MediaData
 
@@ -138,23 +137,9 @@ def logout():
 
 
 # GET display user's watchlist, or POST new item to watchlist
-@app.route('/watchlist', methods=['GET', 'POST'])
+@app.route('/watchlist', methods=['GET'])
 @is_logged_in
 def display_watchlist():
-    if request.method == 'POST':
-        response = requests.post(api.url_for(Wlist, _external=True),
-            data={
-                'mid': request.form['mid'], 'mtype': request.form['mtype'],
-                'title': request.form['title'], 'year': request.form['year'],
-                'email': session['email']})
-        if response.status_code == 204:
-            flash('Item added to watchlist', 'success')
-        elif response.status_code == 404:
-            flash('Item already in watchlist', 'danger')
-        else:
-            flash('Item not added to watchlist', 'danger')
-        return redirect(url_for('display_watchlist'))
-        
     mtype = request.args.get('mtype')  # retains search dropdown value
 
     # connect to db and get user     TODO use api here
@@ -164,7 +149,7 @@ def display_watchlist():
 
     wl_detail = []
     for item in user['watchlist']:
-        m = requests.get(api.url_for(Media, mtype=item['mtype'],
+        m = requests.get(api.url_for(MediaAPI, mtype=item['mtype'],
                                      mid=int(item['id']), _external=True))
         if m.status_code == 200:
             m = json.loads(m.json())
@@ -257,7 +242,7 @@ def mediainfo(mtype='movie', mid=None):
     check_add_amz_source(summary['title'], summary['year'], mtype)
 
     # local api request to check for sources
-    media = requests.get(api.url_for(Media, mtype=mtype,
+    media = requests.get(api.url_for(MediaAPI, mtype=mtype,
                                      mid=mid, _external=True))
     if media.status_code == 200:
         media = json.loads(media.json())
@@ -347,7 +332,7 @@ def check_add_amz_source(title, year, mtype):
 @app.route('/watchlist/delete/<mtype>/<int:mid>', methods=['GET'])
 @is_logged_in
 def delFromWatchlist(mtype=None, mid=None):
-    response = requests.delete(api.url_for(WlistItem, mtype=mtype,
+    response = requests.delete(api.url_for(WatchItemAPI, mtype=mtype,
                  mid=mid, _external=True, email=session['email']))
     if response.status_code == 204:
         flash('Item deleted from watchlist', 'success')
@@ -357,64 +342,67 @@ def delFromWatchlist(mtype=None, mid=None):
 
 
 '''Local API Section'''
-class Media(Resource):
+class MediaAPI(Resource):
     def get(self, mtype, mid):
         media = db.Media.find_one({'mtype': mtype, 'id': mid})
         if not media:
             return '', 404
-        return dumps(media), 200  # pymongo BSON conversion to json
+        return dumps(media), 200  # pymongo BSON conversion to json TODO check if need this per UserAPI below that works, yes need to change it is red/bad in browser
     # TODO create a POST here
     # TODO create a PUT here to update source new or update active=False
 
 
-class User(Resource):
+class UserAPI(Resource):
+    decorators = [is_logged_in]
+    def get(self):
+        user = db.Users.find_one({'email': session['email']},
+                                  {'_id': 0, 'dateCreated': 0})
+        if not user:
+            return '', 404
+        return user, 200
+
+
+class WatchlistAPI(Resource):
     decorators = [is_logged_in]
     def get(self):
         user = db.Users.find_one({'email': session['email']})
         if not user:
             return '', 404
-        return dumps(user), 200
-
-
-# local api, watchlist, GET all or POST one
-class Wlist(Resource):
-    def get(self):
-        db = pymongo.MongoClient('localhost', 27017).MediaData
-        email = session['email']
-        user = db.Users.find_one({'email': email})
-        return user['watchlist']
+        return user['watchlist'], 200
     def post(self):
-        db = pymongo.MongoClient('localhost', 27017).MediaData
-
         # check if media already in watchlist and if so exit
-        user = db.Users.find_one({'email': request.form['email']})
-        all_mids = [w['id'] for w in user['watchlist']
+        user = db.Users.find_one({'email': session['email']})
+        wl_ids = [w['id'] for w in user['watchlist']
                    if w['mtype'] == request.form['mtype']]
-        if int(request.form['mid']) in all_mids:
-            return '', 404
+        if int(request.form['id']) in wl_ids:
+            # return '', 404  # return JSON if pure restful
+            flash('Item already in watchlist', 'danger')
+            return redirect(url_for('display_watchlist'))
 
         # add to user's watchlist
-        db.Users.find_one_and_update({'email': request.form['email']},
+        db.Users.find_one_and_update({'email': session['email']},
           {'$push': {'watchlist':
-            {'id': int(request.form['mid']), 'mtype': request.form['mtype'],
+            {'id': int(request.form['id']), 'mtype': request.form['mtype'],
              'title': request.form['title'], 'year': request.form['year']}}})
-        return '', 204
+        # return '', 204  # return JSON if pure restful
+        flash('Item added to watchlist', 'success')
+        return redirect(url_for('display_watchlist'))
 
 
 # local api, watchlist, DELETE one
-class WlistItem(Resource):
+class WatchItemAPI(Resource):
     def delete(self, mtype, mid, email):
         db = pymongo.MongoClient('localhost', 27017).MediaData
         db.Users.find_one_and_update({'email': email},
             {'$pull': {'watchlist': {'mtype': mtype, 'id': mid}}})
         return '', 204
 
-# set up api resource routing, TODO add auth on POST and DELETE requests
-api.add_resource(Media, '/api/<mtype>/<int:mid>')
-api.add_resource(User, '/api/user')
-api.add_resource(Wlist, '/api/watchlist')
-api.add_resource(WlistItem, '/api/watchlist/<mtype>/<int:mid>/<email>')
 
+# set up api resource routing
+api.add_resource(MediaAPI, '/api/<mtype>/<int:mid>')
+api.add_resource(UserAPI, '/api/user')
+api.add_resource(WatchlistAPI, '/api/watchlist')
+api.add_resource(WatchItemAPI, '/api/watchlist/<mtype>/<int:mid>/<email>')
 
 if __name__ == "__main__":
     app.secret_key = '3d6gtrje6d2rffe2jqkv'

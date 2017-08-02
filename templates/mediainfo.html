@@ -21,8 +21,8 @@
             <div>{{ summary['overview'] }}</div>
             {% if session.logged_in %}
               <div style='margin-top:5px'>
-                <form method="POST" action="/watchlist">
-                  <input type="hidden" name="mid" value="{{ summary['id'] }}" />
+                <form method="POST" action="/api/watchlist"> 
+                  <input type="hidden" name="id" value="{{ summary['id'] }}" />
                   <input type="hidden" name="mtype" value="{{ mtype }}" />
                   <input type="hidden" name="title" value="{{ summary['title'] }}" />
                   <input type="hidden" name="year" value="{{ summary['year'] }}" />

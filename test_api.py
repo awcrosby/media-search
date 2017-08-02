@@ -8,7 +8,6 @@ class MediaSearchApiTestCase(unittest.TestCase):
     '''This class represents the api test case and will run each test_* func'''
 
     def setUp(self):  # runs before every 'test_' function
-        self.base_url = 'http://media.awctech.com:8181'
         self.app = flaskapp.app.test_client()
 
     #def tearDown(self):  # runs after every 'test_' function
@@ -18,7 +17,7 @@ class MediaSearchApiTestCase(unittest.TestCase):
         return self.app.post('/login', data=dict(
             email=email,
             password=password
-        ), follow_redirects=True)
+        ), follow_redirects=False)
 
     def logout(self):
         return self.app.get('/logout', follow_redirects=True)
@@ -28,24 +27,23 @@ class MediaSearchApiTestCase(unittest.TestCase):
         self.assertTrue('Email not found' in rv.data)
         rv = self.login('dale@coop.com', 'bad_password')
         self.assertTrue('Invalid login' in rv.data)
-        #rv = self.login('dale@coop.com', '123')
-        #self.assertTrue('You are now logged in' in rv.data)
-        # TODO fix: on load of /watchlist, the GET done to display media
-        # has connection refused, think related to test_client instance
+        rv = self.login('dale@coop.com', '123')
+        self.assertTrue('target URL: <a href="/watchlist">' in rv.data)
 
 
     def test_get_media_by_id(self):
         rv = self.app.get('/api/show/1920')
-        data = json.loads(json.loads(rv.data))  # TODO stop returning '"{}"'
+        data = json.loads(json.loads(rv.data))
         self.assertEqual(rv.status_code, 200)
         self.assertEqual(data['title'], 'Twin Peaks')
         # TODO write tests for media POST and PUTx2 after written in API
-
+        # POST will need to be in diff restfulflask class to enforce loggedin
 
     def test_get_user(self):
-        rv = self.login('dale@coop.com', '123')  # throws error, but login ok
+        rv = self.login('dale@coop.com', '123')
+        self.assertTrue('target URL: <a href="/watchlist">' in rv.data)
         rv = self.app.get('/api/user')
-        data = json.loads(json.loads(rv.data))
+        data = json.loads(rv.data)
         self.assertEqual(rv.status_code, 200)
         self.assertEqual(data['email'], 'dale@coop.com')
 
@@ -58,18 +56,18 @@ class MediaSearchApiTestCase(unittest.TestCase):
         rv = self.app.post('/api/user', data)
         data = json.loads(json.loads(rv.data))
         self.assertEqual(rv.status_code, 201)
-        self.assertEqual(data['email'], 'imma@newuser.com')
+        self.assertEqual(data['email'], 'imma@newuser.com')'''
 
 
     def test_get_watchlist(self):
-        # TODO execute login when working from unittest
-        # possible to use /api/user and get watchlist like that
+        rv = self.login('dale@coop.com', '123')
+        self.assertTrue('target URL: <a href="/watchlist">' in rv.data)
         rv = self.app.get('/api/watchlist')
-        data = json.loads(json.loads(rv.data))
+        data = json.loads(rv.data)
         self.assertEqual(rv.status_code, 200)
         self.assertTrue(1920 in [i['id'] for i in data if i['mtype'] == 'show'])
 
-
+    '''
     def test_add_to_watchlist(self):
         # TODO execute login when working from unittest
         wl_item = {'id': 10428,
