@@ -80,23 +80,18 @@ def register():
         email = form.email.data
         password = sha256_crypt.encrypt(str(form.password.data))
 
-        # connect to db and insert new user
-        client = pymongo.MongoClient('localhost', 27017)
-        db = client.MediaData
-        try:
-            db.Users.insert_one({
+        # insert new user into database
+        ack = insert_user_to_db({
                 'name': name,
                 'email': email,
                 'password': password,
                 'dateCreated': datetime.datetime.utcnow(),
-                'watchlist': []
-            })
-        except pymongo.errors.DuplicateKeyError:
+                'watchlist': [] })
+        if ack:
+            flash('You are now registered and can log in', 'success')
+            return redirect(url_for('login'))
+        else:
             flash('That email is already registered', 'danger')
-            return redirect(url_for('register'))
-
-        flash('You are now registered and can log in', 'success')
-        return redirect(url_for('login'))
     return render_template('register.html', form=form)
 
 
@@ -108,12 +103,8 @@ def login():
         email = request.form['email']
         password_candidate = request.form['password']
 
-        # connect to db
-        client = pymongo.MongoClient('localhost', 27017)
-        db = client.MediaData
-
         # get user by email and check password
-        user = db.Users.find_one({'email': email})
+        user = get_user_from_db(email)
         if user:
             if sha256_crypt.verify(password_candidate, user['password']):
                 # passwords match
@@ -142,22 +133,17 @@ def logout():
 def display_watchlist():
     mtype = request.args.get('mtype')  # retains search dropdown value
 
-    # connect to db and get user     TODO use api here
+    # get user from database
     start = time.time()
-    db = pymongo.MongoClient('localhost', 27017).MediaData
-    user = db.Users.find_one({'email': session['email']})
+    user = get_user_from_db(session['email'])
 
     wl_detail = []
     for item in user['watchlist']:
-        m = requests.get(api.url_for(MediaAPI, mtype=item['mtype'],
-                                     mid=int(item['id']), _external=True))
-        if m.status_code == 200:
-            m = json.loads(m.json())
-            wl_detail.append(m)
-        else:  # if api did not return data for the item
+        full_media = get_media_from_db(item['mtype'], int(item['id']))
+        if full_media:
+            wl_detail.append(full_media)
+        else:  # if db lookup did not return data for the item
             wl_detail.append(item)
-
-        #wl_detail.append(item)
 
     print 'time to get media of full watchlist: ', time.time() - start
     return render_template('watchlist.html', medias=wl_detail, mtype=mtype)
@@ -241,11 +227,8 @@ def mediainfo(mtype='movie', mid=None):
     # check if this title/year avail on amz and write to db
     check_add_amz_source(summary['title'], summary['year'], mtype)
 
-    # local api request to check for sources
-    media = requests.get(api.url_for(MediaAPI, mtype=mtype,
-                                     mid=mid, _external=True))
-    if media.status_code == 200:
-        media = json.loads(media.json())
+    # get media from db to check for sources
+    media = get_media_from_db(mtype, mid)
 
     return render_template('mediainfo.html', media=media,
                            mtype=mtype, summary=summary)
@@ -328,40 +311,37 @@ def check_add_amz_source(title, year, mtype):
     provider_search.lookup_and_write_medias([media], mtype, source)
 
 
-# route to allow browser click to make HTTP DELETE request
+'''Section for DB calls, including REST API for browser requests'''
+def get_media_from_db(mtype, mid):
+    return db.Media.find_one({'mtype': mtype, 'id': mid}, {'_id': 0})
+
+
+def get_user_from_db(email):
+    return db.Users.find_one({'email': email})
+
+
+def insert_user_to_db(new_user):
+    try:
+        written_user = db.Users.insert_one(new_user)
+        return written_user.acknowledged
+    except pymongo.errors.DuplicateKeyError:
+        return False
+
+
+# route to allow browser click to initiate delete watchlist item
 @app.route('/watchlist/delete/<mtype>/<int:mid>', methods=['GET'])
 @is_logged_in
 def delFromWatchlist(mtype=None, mid=None):
-    response = requests.delete(api.url_for(WatchItemAPI, mtype=mtype,
-                 mid=mid, _external=True, email=session['email']))
-    if response.status_code == 204:
+    resp = db.Users.find_one_and_update({'email': session['email']},
+        {'$pull': {'watchlist': {'mtype': mtype, 'id': mid}}})
+    if resp:
         flash('Item deleted from watchlist', 'success')
     else:
         flash('Item not deleted from watchlist', 'danger')
     return redirect(url_for('display_watchlist'))
 
 
-'''Local API Section'''
-class MediaAPI(Resource):
-    def get(self, mtype, mid):
-        media = db.Media.find_one({'mtype': mtype, 'id': mid})
-        if not media:
-            return '', 404
-        return dumps(media), 200  # pymongo BSON conversion to json TODO check if need this per UserAPI below that works, yes need to change it is red/bad in browser
-    # TODO create a POST here
-    # TODO create a PUT here to update source new or update active=False
-
-
-class UserAPI(Resource):
-    decorators = [is_logged_in]
-    def get(self):
-        user = db.Users.find_one({'email': session['email']},
-                                  {'_id': 0, 'dateCreated': 0})
-        if not user:
-            return '', 404
-        return user, 200
-
-
+# REST-like API, post via browser, get only by unittest now, js in future
 class WatchlistAPI(Resource):
     decorators = [is_logged_in]
     def get(self):
@@ -389,20 +369,9 @@ class WatchlistAPI(Resource):
         return redirect(url_for('display_watchlist'))
 
 
-# local api, watchlist, DELETE one
-class WatchItemAPI(Resource):
-    def delete(self, mtype, mid, email):
-        db = pymongo.MongoClient('localhost', 27017).MediaData
-        db.Users.find_one_and_update({'email': email},
-            {'$pull': {'watchlist': {'mtype': mtype, 'id': mid}}})
-        return '', 204
-
-
 # set up api resource routing
-api.add_resource(MediaAPI, '/api/<mtype>/<int:mid>')
-api.add_resource(UserAPI, '/api/user')
 api.add_resource(WatchlistAPI, '/api/watchlist')
-api.add_resource(WatchItemAPI, '/api/watchlist/<mtype>/<int:mid>/<email>')
+
 
 if __name__ == "__main__":
     app.secret_key = '3d6gtrje6d2rffe2jqkv'

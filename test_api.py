@@ -1,8 +1,8 @@
 # test_api.py
 import unittest
-import requests
 import json
 import flaskapp
+
 
 class MediaSearchApiTestCase(unittest.TestCase):
     '''This class represents the api test case and will run each test_* func'''
@@ -10,8 +10,7 @@ class MediaSearchApiTestCase(unittest.TestCase):
     def setUp(self):  # runs before every 'test_' function
         self.app = flaskapp.app.test_client()
 
-    #def tearDown(self):  # runs after every 'test_' function
-        # attempt to remove this watchlist item from the database
+    # def tearDown(self):  # runs after every 'test_' function
 
     def login(self, email, password):
         return self.app.post('/login', data=dict(
@@ -30,65 +29,41 @@ class MediaSearchApiTestCase(unittest.TestCase):
         rv = self.login('dale@coop.com', '123')
         self.assertTrue('target URL: <a href="/watchlist">' in rv.data)
 
-
-    def test_get_media_by_id(self):
-        rv = self.app.get('/api/show/1920')
-        data = json.loads(json.loads(rv.data))
-        self.assertEqual(rv.status_code, 200)
-        self.assertEqual(data['title'], 'Twin Peaks')
-        # TODO write tests for media POST and PUTx2 after written in API
-        # POST will need to be in diff restfulflask class to enforce loggedin
-
-    def test_get_user(self):
-        rv = self.login('dale@coop.com', '123')
-        self.assertTrue('target URL: <a href="/watchlist">' in rv.data)
-        rv = self.app.get('/api/user')
-        data = json.loads(rv.data)
-        self.assertEqual(rv.status_code, 200)
-        self.assertEqual(data['email'], 'dale@coop.com')
-
-    '''
-    def test_create_user(self):
-        data = {'name': 'Imma Newuser',
-                'email': 'imma@newuser.com',
-                'password': 'this_would_be_a_hash',
-                'watchlist': []}
-        rv = self.app.post('/api/user', data)
-        data = json.loads(json.loads(rv.data))
-        self.assertEqual(rv.status_code, 201)
-        self.assertEqual(data['email'], 'imma@newuser.com')'''
-
-
     def test_get_watchlist(self):
+        # note this is not used by flaskapp.py or client
         rv = self.login('dale@coop.com', '123')
-        self.assertTrue('target URL: <a href="/watchlist">' in rv.data)
         rv = self.app.get('/api/watchlist')
-        data = json.loads(rv.data)
         self.assertEqual(rv.status_code, 200)
-        self.assertTrue(1920 in [i['id'] for i in data if i['mtype'] == 'show'])
+        self.assertTrue(1920 in [i['id'] for i in json.loads(rv.data)])
 
-    '''
     def test_add_to_watchlist(self):
-        # TODO execute login when working from unittest
+        rv = self.login('dale@coop.com', '123')
         wl_item = {'id': 10428,
                    'mtype': 'movie',
                    'title': 'Hackers',
                    'year': '1995'}
-        rv = self.app.post('/api/watchlist', data)
-        data = json.loads(json.loads(rv.data))
-        self.assertEqual(rv.status_code, 201)
-        self.assertEqual(data['title'], 'Hackers')
-        
+        rv = self.app.post('/api/watchlist', data=wl_item)
+
+        # since post redirects and not return json, test via get
+        rv = self.app.get('/api/watchlist')
+        self.assertTrue(10428 in [i['id'] for i in json.loads(rv.data)])
 
     def test_delete_from_watchlist(self):
-        # TODO execute login when working from unittest
-        # TODO add Hackers to watchlist
-        data = {'id': 10428}
-        rv = self.app.delete('/api/watchlist', data)
-        data = json.loads(json.loads(rv.data))
-        self.assertEqual(rv.status_code, 201)
-        self.assertEqual(data['title'], 'Hackers')
-    '''
+        # add and check to it is in watchlist
+        rv = self.login('dale@coop.com', '123')
+        wl_item = {'id': 10428,
+                   'mtype': 'movie',
+                   'title': 'Hackers',
+                   'year': '1995'}
+        rv = self.app.post('/api/watchlist', data=wl_item)
+        rv = self.app.get('/api/watchlist')
+        self.assertTrue(10428 in [i['id'] for i in json.loads(rv.data)])
+
+        # delete and check deleted
+        rv = self.app.get('/watchlist/delete/movie/10428')
+        rv = self.app.get('/api/watchlist')
+        self.assertFalse(10428 in [i['id'] for i in json.loads(rv.data)])
+
 
 if __name__ == '__main__':
     unittest.main()
