@@ -1,4 +1,7 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 # test_api.py
+
 import unittest
 import json
 import flaskapp
@@ -8,6 +11,7 @@ class MediaSearchApiTestCase(unittest.TestCase):
     '''This class represents the api test case and will run each test_* func'''
 
     def setUp(self):  # runs before every 'test_' function
+        self.baseurl = 'http://media.awctech.com:8181'
         self.app = flaskapp.app.test_client()
 
     # def tearDown(self):  # runs after every 'test_' function
@@ -28,6 +32,20 @@ class MediaSearchApiTestCase(unittest.TestCase):
         self.assertTrue('Invalid login' in rv.data)
         rv = self.login('dale@coop.com', '123')
         self.assertTrue('target URL: <a href="/watchlist">' in rv.data)
+
+
+    def test_user_search(self):
+        rv = self.app.get(self.baseurl + '/search?q=terminator&mtype=all')
+        self.assertEqual(rv.status_code, 200)
+        self.assertTrue('Search results for' in rv.data)
+        rv = self.app.get(self.baseurl + '/search?q=asdf2847asdf&mtype=all')
+        self.assertEqual(rv.status_code, 200)
+        self.assertTrue('did not match any results' in rv.data)
+        rv = self.app.get(self.baseurl + '/search?q=broad+city&mtype=show')
+        self.assertEqual(rv.status_code, 302) # redirect to mediainfo.html
+        rv = self.app.get(self.baseurl + '/search?q=Ӕon+Flux&mtype=all')
+        self.assertEqual(rv.status_code, 302) # redirect to mediainfo.html
+
 
     def test_get_watchlist(self):
         # note this is not used by flaskapp.py or client

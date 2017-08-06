@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+# flaskapp.py
+
 from flask import (Flask, render_template, request, redirect,
                    url_for, flash, session, json, abort)
 from flask_restful import Resource, Api, reqparse
@@ -123,7 +125,7 @@ def logout():
     return redirect(url_for('login'))
 
 
-# GET display user's watchlist, or POST new item to watchlist
+# display user's watchlist
 @app.route('/watchlist', methods=['GET'])
 @is_logged_in
 def display_watchlist():
@@ -145,7 +147,7 @@ def display_watchlist():
     return render_template('watchlist.html', medias=wl_detail, mtype=mtype)
 
 
-# send user query to themoviedb api and return json
+# send user query to themoviedb api and return results or single mediainfo.html
 @app.route('/search', methods=['GET'])
 def search(mtype='movie', query=''):
     # ensure GET data is valid
@@ -162,8 +164,7 @@ def search(mtype='movie', query=''):
         'api_key': json.loads(open('apikeys.json').read())['tmdb'],
         'query': query
     }
-    logging.info('user query, {}: {}'.format(mtype, query))
-    print 'user query, {}: {}'.format(mtype, query)
+    logging.info(u'user query, {}: {}'.format(mtype, query))
 
     # search via themoviedb api, take first result and any pop others
     mv, sh, mv['results'], sh['results'] = ({}, {}, [], [])
@@ -207,7 +208,8 @@ def mediainfo(mtype='movie', mid=None):
         abort(400)
 
     # get summary info from themoviedb api, exit if not found
-    params = {'api_key': json.loads(open('apikeys.json').read())['tmdb']}
+    params = {'api_key': json.loads(open('apikeys.json').read())['tmdb'],
+              'append_to_response': 'credits'}
     tmdb_url = ('https://api.themoviedb.org/3/movie/' if mtype == 'movie'
                 else 'https://api.themoviedb.org/3/tv/')
     summary = requests.get(tmdb_url + str(mid), params=params)
@@ -237,80 +239,65 @@ def mediainfo(mtype='movie', mid=None):
 
 
 def check_add_amz_source(media):
-    '''Non-Amz approach: scrape title then search themoviedb for 1st result
-       ok because its searching in ~all media ever
-       Amz: themoviedb title to search amz 1st result not ok: any Terminator
-       movie title yields Genisys, so check if title/year exact match'''
-
-    '''search amz for "Where The Red Fern Grows" it has 2003 as top result,
-            themoviedb is 1974, mismatch
-       search amz for "Where The Red Fern Grows 1974" it matches
-       search amz for "Clear and Present Danger 1994" yields no results
-       search amz for "Clear and Present Danger" it matches
-            also "Chaos", "The Assignment"... amz has many date issues either
-            mismatch or uses date of a re-release in ItemSearch results'''
-
     # prepare for amz api search
     title = media['title']
     year = media['year']
     mtype = media['mtype']
+    if mtype == 'movie':
+        crew = media['credits']['crew']
+        director = [c['name'] for c in crew if c['job'] == 'Director']
+        director = director[0] if director else ''
+        director = director.replace('Dave', 'David')
+        if title == 'Terminator Genisys':  # put misspelling so will match
+            director = director.replace('Taylor', 'Talyor')
+        print u'searching amz for {}, director: {}'.format(title, director)
+    else:
+        print u'searching amz for show {}'.format(title)
     k = json.loads(open('apikeys.json').read())
     amz = BN.Amazon(k['amz_access'], k['amz_secret'],
                     k['amz_associate_tag'], MaxQPS=0.9)
     # https://github.com/lionheart/bottlenose/blob/master/README.md
 
-    # search amz with themoviedb title
-    # option to use Title instead of Keywords, but saw Spectre bad date
+    # search amz with themoviedb info
     if mtype == 'movie':
         results = amz.ItemSearch(
             SearchIndex='Movies',
             ResponseGroup='ItemAttributes',  # type of response
             BrowseNode='2676882011',  # product type of prime video
-            Keywords='{} {}'.format(title, year))  # too many year mismatches
-            # Keywords='{}'.format(title))
+            Title=title,
+            Keywords=director)
     else:
         results = amz.ItemSearch(
             SearchIndex='Movies',
             ResponseGroup='ItemAttributes,RelatedItems',  # type of response
             BrowseNode='2676882011',  # product type of prime video
             RelationshipType='Episode',  # necessary to get show title
-            Title=title)  # Keywords option, but had 'commentary' in title
+            Title=title)
 
     # ensure results not empty
     soup = BeautifulSoup(results, "xml")
     if int(soup.find('TotalResults').text) == 0:
-        logging.info('amz api: {}: no results found'.format(title))
+        logging.info(u'amz api: {}: no results found'.format(title))
         return
 
     # get title from first result
     if mtype == 'movie':
         if not soup.find('Item').find('ReleaseDate'):
-            logging.info('amz api: {}: no rel yr in top result'.format(title))
+            logging.info(u'amz api: {}: no rel yr in top result'.format(title))
             return  # likely means this result is obscure
         amz_title = soup.find('Item').find('Title').text  # title of 1st result
         amz_year = soup.find('Item').find('ReleaseDate').text[:4]
-    else:  # note: seems difficult to get show's very first release date
+    else:
         if not len(soup.find('Item').find_all('Title')) > 1:
-            logging.info('amz api: {}: show title not found'.format(title))
+            logging.info(u'amz api: {}: show title not found'.format(title))
+            # show: Daniel Tiger's Neighborhood has only 1 title, so false neg
             return
         amz_title = soup.find('Item').find_all('Title')[1].text
         pos_season = amz_title.find('Season') - 1
         amz_title = amz_title[:pos_season].rstrip('- ')
-
-    # clean title strings and compare if a match
-    t1 = title.translate({ord(c): None for c in "'’:"})
-    t1 = t1.lower().replace('&', 'and')
-    t2 = amz_title.translate({ord(c): None for c in "'’:"})
-    t2 = t2.lower().replace('&', 'and')
-    if t1 != t2:
-        logging.info('amz api: {}: no title match: {} | {}'.format(title, t1, t2))
-        #return
-
-    # check movie years and compare if a match
-    logging.info('amz api: {}: match found: {} | {}'.format(title, t1, t2))
-    if mtype == 'movie' and amz_year != year:
-        logging.warning('amz api movie year mismatch: '
-            + '{}: amz: {}, tmdb: {}'.format(title, amz_year, year))
+        amz_year = ''  # not used to compare, can't easily get 1st release date
+    logging.info(u'amz api match found: {}: amz{}, tmdb{}'.format(
+        title, amz_year, year))
 
     # insert db media if not there
     insert_media_if_new(media)
@@ -334,7 +321,7 @@ def insert_media_if_new(media):
     if not db.Media.find_one({'mtype': media['mtype'],
                               'id': media['id']}):
         db.Media.insert_one(media)
-        logging.info('db wrote new media: ' + media['title'])
+        logging.info(u'db wrote new media: ' + media['title'])
     return
 
 
@@ -342,13 +329,14 @@ def update_media_with_source(media, source):
     db_media = db.Media.find_one({'mtype': media['mtype'],
                                   'id': media['id']})
     if not db_media:
-        logging.error('could not find media to update source')
+        logging.error(u'could not find media to update source')
         return
     if not any(source['name'] in d.values() for d in db_media['sources']):
         db.Media.find_one_and_update({'mtype': media['mtype'],
                                       'id': media['id']},
             {'$push': {'sources': source}})
-        logging.info('{} added for: {}'.format(source['name'], media['title']))
+        logging.info(u'{} added for: {}'.format(source['name'],
+                                                media['title']))
 
 
 def get_user_from_db(email):

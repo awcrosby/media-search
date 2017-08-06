@@ -472,8 +472,10 @@ def lookup_and_write_medias(medias, mtype, source):
 
         # check if titles are not exact match, in future may not append these
         t1 = m['title'].translate({ord(c): None for c in "'’:"})
+        t1 = t1.lower().replace('&', 'and')
         t2 = full_media['title'].translate({ord(c): None for c in "'’:"})
-        if t1.lower().replace('&', 'and') != t2.lower().replace('&', 'and'):
+        t2 = t2.lower().replace('&', 'and')
+        if t1 != t2:
             logging.warning('not exact titles: ' +
                             full_media['title'] + ' | ' + m['title'])
 
