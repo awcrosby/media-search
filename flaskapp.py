@@ -10,6 +10,7 @@ import pymongo
 import logging
 import datetime
 import requests
+import re
 from wtforms import Form, StringField, PasswordField, validators
 from passlib.hash import sha256_crypt
 from functools import wraps
@@ -150,33 +151,26 @@ def display_watchlist():
 # send user query to themoviedb api and return results or single mediainfo.html
 @app.route('/search', methods=['GET'])
 def search(mtype='movie', query=''):
-    # ensure GET data is valid
+    # ensure GET data is valid, and prepare for search
     query = request.args.get('q')  # can be string or NoneType
     mtype = request.args.get('mtype')
-    session['dropdown'] = mtype
     if not query or (mtype not in ['movie', 'show', 'all']):
         return render_template('home.html')
+    session['dropdown'] = mtype
     query = query.strip()
-
-    # setup api interaction and log query
-    tmdb_url = 'https://api.themoviedb.org/3/search/'
-    params = {
-        'api_key': json.loads(open('apikeys.json').read())['tmdb'],
-        'query': query
-    }
     logging.info(u'user query, {}: {}'.format(mtype, query))
 
     # search via themoviedb api, take first result and any pop others
     mv, sh, mv['results'], sh['results'] = ({}, {}, [], [])
     if mtype == 'movie' or mtype == 'all':
-        mv = requests.get(tmdb_url+'movie', params=params).json()
+        mv = themoviedb_search(query, 'movie')
         pop_after_first = [m for m in mv['results'][1:]
                            if m['vote_count'] >= 10 or m['popularity'] > 10]
         mv['results'] = [m for m in mv['results'][:1]] + pop_after_first
         mv['results'] = [m for m in mv['results'] if m['release_date']]
         mv['results'] = [m for m in mv['results'] if m['poster_path']]
     if mtype == 'show' or mtype == 'all':
-        sh = requests.get(tmdb_url+'tv', params=params).json()
+        sh = themoviedb_search(query, 'show')
         pop_after_first = [m for m in sh['results'][1:]
                            if m['vote_count'] >= 10 or m['popularity'] > 10]
         sh['results'] = [m for m in sh['results'][:1]] + pop_after_first
@@ -201,41 +195,67 @@ def search(mtype='movie', query=''):
                                query=query)
 
 
+# search themoviedb via user query or scraped title
+def themoviedb_search(query, mtype):
+    tmdb_url = 'https://api.themoviedb.org/3/search/'
+    params = {'api_key': json.loads(open('apikeys.json').read())['tmdb']}
+
+    # if year is in query, remove and use as search param
+    if re.search('\([0-9][0-9][0-9][0-9]\)$', query):
+        title_year = query[-5:-1]
+        query = query[:-6].strip()
+        params['year'] = title_year
+
+    # lookup media dict from themoviedb
+    params['query'] = query
+    search_type = 'movie' if mtype == 'movie' else 'tv'
+    return requests.get(tmdb_url+search_type, params=params).json()
+
+
 # lookup via media id for mediainfo.html
 @app.route('/<mtype>/id/<int:mid>', methods=['GET'])
-def mediainfo(mtype='movie', mid=None):
+def mediainfo(mtype='', mid=None):
     if mtype not in ['movie', 'show']:
         abort(400)
 
     # get summary info from themoviedb api, exit if not found
+    media = themoviedb_lookup(mtype, mid)
+    if not media:
+        flash('Media id not found', 'danger')
+        return redirect(url_for('home'))
+
+    # check if this title/year avail on amz, if so write to db
+    check_add_amz_source(media)
+
+    # TODO if this has result send this to template else send above media
+    # get media from db to check for sources
+    db_media = get_media_from_db(mtype, mid)
+
+    return render_template('mediainfo.html', media=db_media,
+                           mtype=mtype, summary=media)
+
+
+# lookup themoviedb media via id
+def themoviedb_lookup(mtype, id):
     params = {'api_key': json.loads(open('apikeys.json').read())['tmdb'],
               'append_to_response': 'credits'}
     tmdb_url = ('https://api.themoviedb.org/3/movie/' if mtype == 'movie'
                 else 'https://api.themoviedb.org/3/tv/')
-    summary = requests.get(tmdb_url + str(mid), params=params)
-    if summary.status_code != 200:
-        flash('Media id not found', 'danger')
-        return redirect(url_for('home'))
-    summary = summary.json()
+    media = requests.get(tmdb_url + str(id), params=params)
+    if media.status_code != 200:
+        return
 
-    # prepare to be written to db, if found as amz source
-    summary['sources'] = []
+    # in case this is written to db, add needed keys
+    media = media.json()
+    media['sources'] = []
     if mtype == 'movie':
-        summary['year'] = summary['release_date'][:4]
-        summary['mtype'] = 'movie'
+        media['year'] = media['release_date'][:4]
+        media['mtype'] = 'movie'
     else:
-        summary['title'] = summary['name']
-        summary['year'] = summary['first_air_date'][:4]
-        summary['mtype'] = mtype
-
-    # check if this title/year avail on amz, if so write to db
-    check_add_amz_source(media=summary)
-
-    # get media from db to check for sources
-    media = get_media_from_db(mtype, mid)
-
-    return render_template('mediainfo.html', media=media,
-                           mtype=mtype, summary=summary)
+        media['title'] = media['name']
+        media['year'] = media['first_air_date'][:4]
+        media['mtype'] = mtype
+    return media
 
 
 def check_add_amz_source(media):
@@ -243,7 +263,8 @@ def check_add_amz_source(media):
     title = media['title']
     year = media['year']
     mtype = media['mtype']
-    if mtype == 'movie':
+    director = ''
+    if mtype == 'movie' and 'credits' in media:
         crew = media['credits']['crew']
         director = [c['name'] for c in crew if c['job'] == 'Director']
         director = director[0] if director else ''
@@ -277,26 +298,26 @@ def check_add_amz_source(media):
     # ensure results not empty
     soup = BeautifulSoup(results, "xml")
     if int(soup.find('TotalResults').text) == 0:
-        logging.info(u'amz api: {}: no results found'.format(title))
+        logging.info(u'amz api no match: {}'.format(title))
         return
 
     # get title from first result
     if mtype == 'movie':
         if not soup.find('Item').find('ReleaseDate'):
-            logging.info(u'amz api: {}: no rel yr in top result'.format(title))
+            logging.info(u'amz api issue no rel yr: {}'.format(title))
             return  # likely means this result is obscure
         amz_title = soup.find('Item').find('Title').text  # title of 1st result
         amz_year = soup.find('Item').find('ReleaseDate').text[:4]
     else:
         if not len(soup.find('Item').find_all('Title')) > 1:
-            logging.info(u'amz api: {}: show title not found'.format(title))
+            logging.info(u'amz api issue no title: {}'.format(title))
             # show: Daniel Tiger's Neighborhood has only 1 title, so false neg
             return
         amz_title = soup.find('Item').find_all('Title')[1].text
         pos_season = amz_title.find('Season') - 1
         amz_title = amz_title[:pos_season].rstrip('- ')
         amz_year = ''  # not used to compare, can't easily get 1st release date
-    logging.info(u'amz api match found: {}: amz{}, tmdb{}'.format(
+    logging.info(u'amz api match: {}: amz{}, tmdb{}'.format(
         title, amz_year, year))
 
     # insert db media if not there
@@ -331,6 +352,9 @@ def update_media_with_source(media, source):
     if not db_media:
         logging.error(u'could not find media to update source')
         return
+    if not 'sources' in db_media:
+        logging.error(u'unexpected, db media exists with no sources list')
+        return
     if not any(source['name'] in d.values() for d in db_media['sources']):
         db.Media.find_one_and_update({'mtype': media['mtype'],
                                       'id': media['id']},
@@ -356,6 +380,16 @@ def get_all_watchlist_in_db():
     wl_all = [item for wl in wl_cur for item in wl['watchlist']]
     wl_unique = [dict(t) for t in set([tuple(d.items()) for d in wl_all])]
     return wl_unique
+
+
+def remove_hulu_addon_media():
+    '''on browse of hulu, for media requiring addons (i.e. showtime)
+    it does not denote this in html (only in an img), so any overlaps
+    with both sources will remove hulu as a source'''
+    x = db.Media.update_many({'sources.name': {'$all': ['hulu', 'showtime']}},
+                         {'$pull': {'sources': {'name': 'hulu'}}})
+    logging.info('hulu removed from {0!s} db docs'.format(x.matched_count))
+    return
 
 
 # route to allow browser click to initiate delete watchlist item

@@ -4,7 +4,6 @@ import sys
 import requests
 import requests_cache
 from bs4 import BeautifulSoup
-import pymongo
 import json
 import re
 from pprint import pprint
@@ -29,15 +28,16 @@ def main():
     #search_showtime()
     #search_netflix()
     #search_hulu()
-    #remove_hulu_addon_media()
     update_watchlist_amz()
+    flaskapp.remove_hulu_addon_media()
 
 
 def update_watchlist_amz():
     # for all unique watchlist items check if amz is a source and add to db
     wl_unique = flaskapp.get_all_watchlist_in_db()
     for m in wl_unique:
-        flaskapp.check_add_amz_source(m)
+        media = flaskapp.themoviedb_lookup(m['mtype'], m['id'])
+        flaskapp.check_add_amz_source(media)
         time.sleep(1.1)
     return
 
@@ -178,17 +178,6 @@ def search_hulu():
     import q; q.d()
     lookup_and_write_medias(medias, mtype='show', source=source)
     driver.quit()
-
-
-def remove_hulu_addon_media():
-    '''on browse of hulu, for media requiring addons (i.e. showtime)
-    it does not denote this in html (only in an img), so any overlaps
-    with both sources will remove hulu as a source'''
-
-    db = pymongo.MongoClient('localhost', 27017).MediaData
-    x = db.Media.update_many({'sources.name': {'$all': ['hulu', 'showtime']}},
-                         {'$pull': {'sources': {'name': 'hulu'}}})
-    logging.info('hulu removed from {0!s} db docs'.format(x.matched_count))
 
 
 def search_netflix():
@@ -427,40 +416,27 @@ def search_hbo():
 
 
 def lookup_and_write_medias(medias, mtype, source):
-    # setup for api and database
-    tmdb_url = 'https://api.themoviedb.org/3/search/'
-    params = {'api_key': json.loads(open('apikeys.json').read())['tmdb']}
-    db = pymongo.MongoClient('localhost', 27017).MediaData
-
     # get unique: list of dict into list of tuples, set, back to dict
-    # logging.info('len(medias) before take unique: ' + str(len(medias)))
+    logging.info('len(medias) before take unique: ' + str(len(medias)))
     medias = [dict(t) for t in set([tuple(d.items()) for d in medias])]
-    # logging.info('len(medias) after take unique: ' + str(len(medias)))
+    logging.info('len(medias) after take unique: ' + str(len(medias)))
 
     for m in medias:
-        # if year is in title, remove from title and use as search param
-        if re.search('\([0-9][0-9][0-9][0-9]\)$', m['title']):
-            title_year = m['title'][-5:-1]
-            m['title'] = m['title'][:-6].strip()
-            params['year'] = title_year
-
-        # lookup media dict from themoviedb, sleep due to api rate limit
-        params['query'] = m['title']
         time.sleep(0.2)
-        search_type = 'movie' if mtype == 'movie' else 'tv'
-        search = requests.get(tmdb_url+search_type, params=params).json()
-        params.pop('year', None)  # clears year if used
+        results = flaskapp.themoviedb_search(m['title'], mtype)
 
         # exit iteration if search not complete or no results
-        if 'total_results' not in search:
+        if 'total_results' not in results:
             logging.error('tmdb search not complete ' + mtype + ': ' + m['title'])
             continue
-        if search['total_results'] < 1:
+        if results['total_results'] < 1:
             logging.warning('tmdb 0 results for ' + mtype + ': ' + m['title'])
             continue
 
+        # assume top result is best match and use it
+        full_media = results['results'][0]
+
         # append data so dict can be saved to database
-        full_media = search['results'][0]
         full_media['mtype'] = mtype
         full_media['sources'] = []
         if mtype == 'movie':
@@ -480,9 +456,6 @@ def lookup_and_write_medias(medias, mtype, source):
                             full_media['title'] + ' | ' + m['title'])
 
         # write db media if new
-        '''if not db.Media.find_one({'mtype': full_media['mtype'], 'id': full_media['id']}):
-            db.Media.insert_one(full_media)
-            logging.info('db wrote new media: ' + full_media['title'])'''
         flaskapp.insert_media_if_new(full_media)  # TODO test on next scrape
 
         # update source with specific media link, if available
@@ -495,14 +468,6 @@ def lookup_and_write_medias(medias, mtype, source):
         print 'full_media', full_media
 
         # update db media with source    TODO test on next scrape
-        '''db_media = db.Media.find_one({'mtype': full_media['mtype'],
-                                      'id': full_media['id']})
-        if (db_media and not any(source['name'] in
-                d.values() for d in db_media['sources'])):
-            db.Media.find_one_and_update({'mtype': full_media['mtype'],
-                                          'id': full_media['id']},
-                {'$push': {'sources': source_to_write}})
-            logging.info(source['name'] + ' added for: ' + full_media['title'])'''
         flaskapp.update_media_with_source(full_media, source_to_write)
 
     ''' one-time db statements: create/view indexes, del all docs in col '''
