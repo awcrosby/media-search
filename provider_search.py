@@ -34,24 +34,11 @@ def main():
 
 
 def update_watchlist_amz():
-    '''searches every watchlist media and checks if amazon is a source
-    and if so adds to database'''
-
-    # get list of all watchlist unique media
-    db = pymongo.MongoClient('localhost', 27017).MediaData
-    wl_cur = db.Users.find({}, {'_id':0, 'watchlist': 1})
-    wl_all = []
-    for wl in wl_cur:
-        wl_all += wl['watchlist']
-    print 'len(wl_all):', len(wl_all)
-    wl_unique = [dict(t) for t in set([tuple(d.items()) for d in wl_all])]
-    print 'len(wl_unique):', len(wl_unique)
-
-    # send each media to check_add_amz_source with sleep for api limit
+    # for all unique watchlist items check if amz is a source and add to db
+    wl_unique = flaskapp.get_all_watchlist_in_db()
     for m in wl_unique:
-        flaskapp.check_add_amz_source(m['title'], m['year'], m['mtype'])
+        flaskapp.check_add_amz_source(m)
         time.sleep(1.1)
-
     return
 
 
@@ -446,9 +433,9 @@ def lookup_and_write_medias(medias, mtype, source):
     db = pymongo.MongoClient('localhost', 27017).MediaData
 
     # get unique: list of dict into list of tuples, set, back to dict
-    logging.info('len(medias) before take unique: ' + str(len(medias)))
+    # logging.info('len(medias) before take unique: ' + str(len(medias)))
     medias = [dict(t) for t in set([tuple(d.items()) for d in medias])]
-    logging.info('len(medias) after take unique: ' + str(len(medias)))
+    # logging.info('len(medias) after take unique: ' + str(len(medias)))
 
     for m in medias:
         # if year is in title, remove from title and use as search param
@@ -491,24 +478,30 @@ def lookup_and_write_medias(medias, mtype, source):
                             full_media['title'] + ' | ' + m['title'])
 
         # write db media if new
-        if not db.Media.find_one({'mtype': full_media['mtype'], 'id': full_media['id']}):
+        '''if not db.Media.find_one({'mtype': full_media['mtype'], 'id': full_media['id']}):
             db.Media.insert_one(full_media)
-            logging.info('db wrote new media: ' + full_media['title'])
+            logging.info('db wrote new media: ' + full_media['title'])'''
+        flaskapp.insert_media_if_new(full_media)  # TODO test on next scrape
 
         # update source with specific media link, if available
         source_to_write = dict(source)
         if 'link' in m.keys():
             source_to_write['link'] = m['link']
 
-        # update db media with source
-        db_media = db.Media.find_one({'mtype': full_media['mtype'],
+        print 'in lookup', source_to_write
+        print 'id: ', full_media['id']
+        print 'full_media', full_media
+
+        # update db media with source    TODO test on next scrape
+        '''db_media = db.Media.find_one({'mtype': full_media['mtype'],
                                       'id': full_media['id']})
         if (db_media and not any(source['name'] in
                 d.values() for d in db_media['sources'])):
             db.Media.find_one_and_update({'mtype': full_media['mtype'],
                                           'id': full_media['id']},
                 {'$push': {'sources': source_to_write}})
-            logging.info(source['name'] + ' added for: ' + full_media['title'])
+            logging.info(source['name'] + ' added for: ' + full_media['title'])'''
+        flaskapp.update_media_with_source(full_media, source_to_write)
 
     ''' one-time db statements: create/view indexes, del all docs in col '''
     # db.Media.create_index(

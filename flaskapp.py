@@ -1,13 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from flask import (Flask, render_template, request, redirect,
-                   url_for, flash, session, abort, jsonify)
+                   url_for, flash, session, json, abort)
 from flask_restful import Resource, Api, reqparse
-from bson.json_util import dumps
-import json
 import time
 import pymongo
-import pprint
 import logging
 import datetime
 import requests
@@ -16,7 +13,6 @@ from passlib.hash import sha256_crypt
 from functools import wraps
 import bottlenose as BN  # amazon product api wrapper
 from bs4 import BeautifulSoup
-import provider_search
 app = Flask(__name__)
 api = Api(app)
 db = pymongo.MongoClient('localhost', 27017).MediaData
@@ -86,7 +82,7 @@ def register():
                 'email': email,
                 'password': password,
                 'dateCreated': datetime.datetime.utcnow(),
-                'watchlist': [] })
+                'watchlist': []})
         if ack:
             flash('You are now registered and can log in', 'success')
             return redirect(url_for('login'))
@@ -207,25 +203,31 @@ def search(mtype='movie', query=''):
 # lookup via media id for mediainfo.html
 @app.route('/<mtype>/id/<int:mid>', methods=['GET'])
 def mediainfo(mtype='movie', mid=None):
-    mtype = 'movie' if mtype != 'show' else 'show'
+    if mtype not in ['movie', 'show']:
+        abort(400)
 
     # get summary info from themoviedb api, exit if not found
     params = {'api_key': json.loads(open('apikeys.json').read())['tmdb']}
     tmdb_url = ('https://api.themoviedb.org/3/movie/' if mtype == 'movie'
-        else 'https://api.themoviedb.org/3/tv/')
+                else 'https://api.themoviedb.org/3/tv/')
     summary = requests.get(tmdb_url + str(mid), params=params)
     if summary.status_code != 200:
         flash('Media id not found', 'danger')
         return redirect(url_for('home'))
     summary = summary.json()
+
+    # prepare to be written to db, if found as amz source
+    summary['sources'] = []
     if mtype == 'movie':
         summary['year'] = summary['release_date'][:4]
+        summary['mtype'] = 'movie'
     else:
         summary['title'] = summary['name']
         summary['year'] = summary['first_air_date'][:4]
+        summary['mtype'] = mtype
 
-    # check if this title/year avail on amz and write to db
-    check_add_amz_source(summary['title'], summary['year'], mtype)
+    # check if this title/year avail on amz, if so write to db
+    check_add_amz_source(media=summary)
 
     # get media from db to check for sources
     media = get_media_from_db(mtype, mid)
@@ -234,7 +236,7 @@ def mediainfo(mtype='movie', mid=None):
                            mtype=mtype, summary=summary)
 
 
-def check_add_amz_source(title, year, mtype):
+def check_add_amz_source(media):
     '''Non-Amz approach: scrape title then search themoviedb for 1st result
        ok because its searching in ~all media ever
        Amz: themoviedb title to search amz 1st result not ok: any Terminator
@@ -249,71 +251,104 @@ def check_add_amz_source(title, year, mtype):
             mismatch or uses date of a re-release in ItemSearch results'''
 
     # prepare for amz api search
+    title = media['title']
+    year = media['year']
+    mtype = media['mtype']
     k = json.loads(open('apikeys.json').read())
-    amz = BN.Amazon(k['amz_access'], k['amz_secret'],k['amz_associate_tag'],
-          MaxQPS=2)
+    amz = BN.Amazon(k['amz_access'], k['amz_secret'],
+                    k['amz_associate_tag'], MaxQPS=0.9)
     # https://github.com/lionheart/bottlenose/blob/master/README.md
 
     # search amz with themoviedb title
     # option to use Title instead of Keywords, but saw Spectre bad date
     if mtype == 'movie':
-        results = amz.ItemSearch(SearchIndex='Movies',
+        results = amz.ItemSearch(
+            SearchIndex='Movies',
             ResponseGroup='ItemAttributes',  # type of response
             BrowseNode='2676882011',  # product type of prime video
-            #Keywords='{} {}'.format(title, year))  # too many year mismatches
-            Keywords='{}'.format(title))
+            Keywords='{} {}'.format(title, year))  # too many year mismatches
+            # Keywords='{}'.format(title))
     else:
-        results = amz.ItemSearch(SearchIndex='Movies',
+        results = amz.ItemSearch(
+            SearchIndex='Movies',
             ResponseGroup='ItemAttributes,RelatedItems',  # type of response
             BrowseNode='2676882011',  # product type of prime video
             RelationshipType='Episode',  # necessary to get show title
-            Title=title)  #  Keywords option, but had 'commentary' in title
+            Title=title)  # Keywords option, but had 'commentary' in title
 
-    # ensure results not empty and release data is present
+    # ensure results not empty
     soup = BeautifulSoup(results, "xml")
     if int(soup.find('TotalResults').text) == 0:
-        logging.info('amazon api - no results found')
+        logging.info('amz api: {}: no results found'.format(title))
         return
 
     # get title from first result
     if mtype == 'movie':
         if not soup.find('Item').find('ReleaseDate'):
-            logging.info('amazon api - no release year in top result')
+            logging.info('amz api: {}: no rel yr in top result'.format(title))
             return  # likely means this result is obscure
         amz_title = soup.find('Item').find('Title').text  # title of 1st result
         amz_year = soup.find('Item').find('ReleaseDate').text[:4]
-        print 'themoviedb: {}, amazon: {}'.format(year, amz_year)
     else:  # note: seems difficult to get show's very first release date
         if not len(soup.find('Item').find_all('Title')) > 1:
-            logging.info('amazon api - show title not found')
+            logging.info('amz api: {}: show title not found'.format(title))
             return
         amz_title = soup.find('Item').find_all('Title')[1].text
         pos_season = amz_title.find('Season') - 1
-        amz_title = amz_title[:pos_season]
-        amz_title = amz_title.rstrip('- ')
+        amz_title = amz_title[:pos_season].rstrip('- ')
 
-    # clean title strings and compare, if title and year match, it is a match
+    # clean title strings and compare if a match
     t1 = title.translate({ord(c): None for c in "'’:"})
     t1 = t1.lower().replace('&', 'and')
     t2 = amz_title.translate({ord(c): None for c in "'’:"})
     t2 = t2.lower().replace('&', 'and')
     if t1 != t2:
-        logging.info('amazon api, no match: {}, {}'.format(t1, t2))
-        return
+        logging.info('amz api: {}: no title match: {} | {}'.format(title, t1, t2))
+        #return
 
-    # append amazon source
-    logging.info('amazon api - found title match')
+    # check movie years and compare if a match
+    logging.info('amz api: {}: match found: {} | {}'.format(title, t1, t2))
+    if mtype == 'movie' and amz_year != year:
+        logging.warning('amz api movie year mismatch: '
+            + '{}: amz: {}, tmdb: {}'.format(title, amz_year, year))
+
+    # insert db media if not there
+    insert_media_if_new(media)
+
+    # update db media with source
     source = {'name': 'amazon',
               'display_name': 'Amazon',
-              'link': 'http://www.amazon.com',
+              'link': soup.find('Item').find('DetailPageURL').text,
               'type': 'subscription_web_sources'}
-    media = {'title': title, 'link': soup.find('Item').find('DetailPageURL').text}
-    provider_search.lookup_and_write_medias([media], mtype, source)
+    update_media_with_source(media, source)    
 
 
 '''Section for DB calls, including REST API for browser requests'''
+
+
 def get_media_from_db(mtype, mid):
     return db.Media.find_one({'mtype': mtype, 'id': mid}, {'_id': 0})
+
+
+def insert_media_if_new(media):
+    if not db.Media.find_one({'mtype': media['mtype'],
+                              'id': media['id']}):
+        db.Media.insert_one(media)
+        logging.info('db wrote new media: ' + media['title'])
+    return
+
+
+def update_media_with_source(media, source):
+    db_media = db.Media.find_one({'mtype': media['mtype'],
+                                  'id': media['id']})
+    if not db_media:
+        logging.error('could not find media to update source')
+        return
+    if not any(source['name'] in d.values() for d in db_media['sources']):
+        db.Media.find_one_and_update({'mtype': media['mtype'],
+                                      'id': media['id']},
+            {'$push': {'sources': source}})
+        logging.info('{} added for: {}'.format(source['name'], media['title']))
 
 
 def get_user_from_db(email):
@@ -328,11 +363,19 @@ def insert_user_to_db(new_user):
         return False
 
 
+def get_all_watchlist_in_db():
+    wl_cur = db.Users.find({}, {'_id':0, 'watchlist': 1})
+    wl_all = [item for wl in wl_cur for item in wl['watchlist']]
+    wl_unique = [dict(t) for t in set([tuple(d.items()) for d in wl_all])]
+    return wl_unique
+
+
 # route to allow browser click to initiate delete watchlist item
 @app.route('/watchlist/delete/<mtype>/<int:mid>', methods=['GET'])
 @is_logged_in
 def delFromWatchlist(mtype=None, mid=None):
-    resp = db.Users.find_one_and_update({'email': session['email']},
+    resp = db.Users.find_one_and_update(
+        {'email': session['email']},
         {'$pull': {'watchlist': {'mtype': mtype, 'id': mid}}})
     if resp:
         flash('Item deleted from watchlist', 'success')
@@ -344,26 +387,30 @@ def delFromWatchlist(mtype=None, mid=None):
 # REST-like API, post via browser, get only by unittest now, js in future
 class WatchlistAPI(Resource):
     decorators = [is_logged_in]
+
     def get(self):
         user = db.Users.find_one({'email': session['email']})
         if not user:
             return '', 404
         return user['watchlist'], 200
+
     def post(self):
         # check if media already in watchlist and if so exit
         user = db.Users.find_one({'email': session['email']})
         wl_ids = [w['id'] for w in user['watchlist']
-                   if w['mtype'] == request.form['mtype']]
+                  if w['mtype'] == request.form['mtype']]
         if int(request.form['id']) in wl_ids:
             # return '', 404  # return JSON if pure restful
             flash('Item already in watchlist', 'danger')
             return redirect(url_for('display_watchlist'))
 
         # add to user's watchlist
-        db.Users.find_one_and_update({'email': session['email']},
+        d = request.form
+        db.Users.find_one_and_update(
+          {'email': session['email']},
           {'$push': {'watchlist':
-            {'id': int(request.form['id']), 'mtype': request.form['mtype'],
-             'title': request.form['title'], 'year': request.form['year']}}})
+                     {'id': int(d['id']), 'mtype': d['mtype'],
+                      'title': d['title'], 'year': d['year']}}})
         # return '', 204  # return JSON if pure restful
         flash('Item added to watchlist', 'success')
         return redirect(url_for('display_watchlist'))
