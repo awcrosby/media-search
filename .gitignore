@@ -10,8 +10,8 @@ demo_cache.sqlite
 # Secure #
 ###################
 apikeys.json
-.amazon-product-api
 
 # Other #
 ###################
 screenshot*.png
+/venv

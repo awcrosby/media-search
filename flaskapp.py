@@ -33,6 +33,11 @@ logging.basicConfig(filename='/home/awcrosby/media-search/'
 app.secret_key = '3d6gtrje6d2rffe2jqkv'
 parser = reqparse.RequestParser()
 
+# initialize database by creating collection and unique index
+def init_database():
+    db = pymongo.MongoClient('localhost', 27017).MediaData
+    db.Media.create_index([('mtype', pymongo.ASCENDING),
+                           ('id', pymongo.ASCENDING)], unique=True)
 
 # check if users logged in
 def is_logged_in(f):
@@ -144,7 +149,7 @@ def display_watchlist():
         else:  # if db lookup did not return data for the item
             wl_detail.append(item)
 
-    print 'time to get media of full watchlist: ', time.time() - start
+    print('time to get media of full watchlist: {}'.format(time.time()-start))
     return render_template('watchlist.html', medias=wl_detail, mtype=mtype)
 
 
@@ -198,7 +203,8 @@ def search(mtype='movie', query=''):
 # search themoviedb via user query or scraped title
 def themoviedb_search(query, mtype):
     tmdb_url = 'https://api.themoviedb.org/3/search/'
-    params = {'api_key': json.loads(open('apikeys.json').read())['tmdb']}
+    with open('apikeys.json', 'r') as f:
+        params = {'api_key': json.loads(f.read())['tmdb']}
 
     # if year is in query, remove and use as search param
     if re.search('\([0-9][0-9][0-9][0-9]\)$', query):
@@ -237,8 +243,9 @@ def mediainfo(mtype='', mid=None):
 
 # lookup themoviedb media via id
 def themoviedb_lookup(mtype, id):
-    params = {'api_key': json.loads(open('apikeys.json').read())['tmdb'],
-              'append_to_response': 'credits'}
+    with open('apikeys.json', 'r') as f:
+        params = {'api_key': json.loads(f.read())['tmdb'],
+                  'append_to_response': 'credits'}
     tmdb_url = ('https://api.themoviedb.org/3/movie/' if mtype == 'movie'
                 else 'https://api.themoviedb.org/3/tv/')
     media = requests.get(tmdb_url + str(id), params=params)
@@ -271,10 +278,11 @@ def check_add_amz_source(media):
         director = director.replace('Dave', 'David')
         if title == 'Terminator Genisys':  # put misspelling so will match
             director = director.replace('Taylor', 'Talyor')
-        print u'searching amz for {}, director: {}'.format(title, director)
+        print(u'searching amz for {}, director: {}'.format(title, director))
     else:
-        print u'searching amz for show {}'.format(title)
-    k = json.loads(open('apikeys.json').read())
+        print(u'searching amz for show {}'.format(title))
+    with open('apikeys.json', 'r') as f:
+        k = json.loads(f.read())
     amz = BN.Amazon(k['amz_access'], k['amz_secret'],
                     k['amz_associate_tag'], MaxQPS=0.9)
     # https://github.com/lionheart/bottlenose/blob/master/README.md

@@ -27,32 +27,32 @@ class MediaSearchApiTestCase(unittest.TestCase):
 
     def test_login_logout(self):
         rv = self.login('bad_email@ex.com', '123')
-        self.assertTrue('Email not found' in rv.data)
+        self.assertTrue('Email not found' in bytes.decode(rv.data))
         rv = self.login('dale@coop.com', 'bad_password')
-        self.assertTrue('Invalid login' in rv.data)
+        self.assertTrue('Invalid login' in bytes.decode(rv.data))
         rv = self.login('dale@coop.com', '123')
-        self.assertTrue('target URL: <a href="/watchlist">' in rv.data)
-
+        self.assertTrue('target URL: <a href="/watchlist">' in
+                        bytes.decode(rv.data))
 
     def test_user_search(self):
         rv = self.app.get(self.baseurl + '/search?q=terminator&mtype=all')
         self.assertEqual(rv.status_code, 200)
-        self.assertTrue('Search results for' in rv.data)
+        self.assertTrue('Search results for' in bytes.decode(rv.data))
         rv = self.app.get(self.baseurl + '/search?q=asdf2847asdf&mtype=all')
         self.assertEqual(rv.status_code, 200)
-        self.assertTrue('did not match any results' in rv.data)
+        self.assertTrue('did not match any results' in bytes.decode(rv.data))
         rv = self.app.get(self.baseurl + '/search?q=broad+city&mtype=show')
-        self.assertEqual(rv.status_code, 302) # redirect to mediainfo.html
+        self.assertEqual(rv.status_code, 302)  # redirect to mediainfo.html
         rv = self.app.get(self.baseurl + '/search?q=Ӕon+Flux&mtype=all')
-        self.assertEqual(rv.status_code, 302) # redirect to mediainfo.html
-
+        self.assertEqual(rv.status_code, 302)  # redirect to mediainfo.html
 
     def test_get_watchlist(self):
         # note this is not used by flaskapp.py or client
         rv = self.login('dale@coop.com', '123')
         rv = self.app.get('/api/watchlist')
         self.assertEqual(rv.status_code, 200)
-        self.assertTrue(1920 in [i['id'] for i in json.loads(rv.data)])
+        json_data = json.loads(bytes.decode(rv.data))
+        self.assertTrue(1920 in [i['id'] for i in json_data])
 
     def test_add_to_watchlist(self):
         rv = self.login('dale@coop.com', '123')
@@ -64,10 +64,11 @@ class MediaSearchApiTestCase(unittest.TestCase):
 
         # since post redirects and not return json, test via get
         rv = self.app.get('/api/watchlist')
-        self.assertTrue(10428 in [i['id'] for i in json.loads(rv.data)])
+        json_data = json.loads(bytes.decode(rv.data))
+        self.assertTrue(10428 in [i['id'] for i in json_data])
 
     def test_delete_from_watchlist(self):
-        # add and check to it is in watchlist
+        # add and check it is in watchlist
         rv = self.login('dale@coop.com', '123')
         wl_item = {'id': 10428,
                    'mtype': 'movie',
@@ -75,12 +76,14 @@ class MediaSearchApiTestCase(unittest.TestCase):
                    'year': '1995'}
         rv = self.app.post('/api/watchlist', data=wl_item)
         rv = self.app.get('/api/watchlist')
-        self.assertTrue(10428 in [i['id'] for i in json.loads(rv.data)])
+        json_data = json.loads(bytes.decode(rv.data))
+        self.assertTrue(10428 in [i['id'] for i in json_data])
 
         # delete and check deleted
         rv = self.app.get('/watchlist/delete/movie/10428')
         rv = self.app.get('/api/watchlist')
-        self.assertFalse(10428 in [i['id'] for i in json.loads(rv.data)])
+        json_data = json.loads(bytes.decode(rv.data))
+        self.assertFalse(10428 in [i['id'] for i in json_data])
 
 
 if __name__ == '__main__':
