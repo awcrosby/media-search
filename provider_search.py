@@ -470,13 +470,22 @@ def lookup_and_write_medias(medias, mtype, source):
         # update db media with source    TODO test on next scrape
         flaskapp.update_media_with_source(full_media, source_to_write)
 
-    ''' one-time db statements: create/view indexes, del all docs in col '''
-    # db.Media.create_index(
-    #   [('mtype', pymongo.ASCENDING), ('id', pymongo.ASCENDING)], unique=True)
-    # print sorted(list(db.Shows.index_information()))
-    # print db.Media.delete_many({})  # delete all shows in database
-    # print db.Media.count()
-    # can run db.Media.reindex() after every purge/scrape
+
+'''
+=amz searches and issues with multiple approaches:=
+"Clear and Present Danger 1994" = no result, amz moviepage year=null | "Gang ~NY 2002" none amz has 2003 (yr diff)
+"Benjamin Button" the result has year=2009, but amz moviepage year=2008 (as does tmdb), amz only gives rel date that changes
+"Snowden" the result has year=2007, diff product than 2016 movie, false pos unless compare year
+"Snowden 2016", no match (good)
+"Deadpool 2016" response is "~Clip: Drawing Deadpool", suggests to compare exact titles
+"Zoolander 2" response is "Zoolander No. 2: The Magnum Edition", suggest to not compare exact titles
+"The Terminator 1984", top result is "Terminator Genisys"
+Title | Keyword director search fixes all above, adds some issues but seem not as big:
+-"Creed | Ryan Coogler" has a documentary about the movie as top result w/ no year, false neg
+-"The Age of Adaline | Lee Toland Krieger" has no results since director not returned by amz, false neg
+-misspelled dir names, fasle negs: "Contract Killer" jet lei, "Terminator Genisys", "Maya the Bee Movie"
+'''
+
 
 if __name__ == "__main__":
     main()
