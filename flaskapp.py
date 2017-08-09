@@ -33,11 +33,14 @@ logging.basicConfig(filename='/home/awcrosby/media-search/'
 app.secret_key = '3d6gtrje6d2rffe2jqkv'
 parser = reqparse.RequestParser()
 
+
 # initialize database by creating collection and unique index
 def init_database():
-    db = pymongo.MongoClient('localhost', 27017).MediaData
     db.Media.create_index([('mtype', pymongo.ASCENDING),
                            ('id', pymongo.ASCENDING)], unique=True)
+
+def reindex_database():
+    db.Media.reindex()
 
 # check if users logged in
 def is_logged_in(f):
@@ -278,9 +281,10 @@ def check_add_amz_source(media):
         director = director.replace('Dave', 'David')
         if title == 'Terminator Genisys':  # put misspelling so will match
             director = director.replace('Taylor', 'Talyor')
-        print(u'searching amz for {}, director: {}'.format(title, director))
+        logging.info(u'searching amz for {}, director: {}'.format(
+                     title, director))
     else:
-        print(u'searching amz for show {}'.format(title))
+        logging.info(u'searching amz for show {}'.format(title))
     with open('apikeys.json', 'r') as f:
         k = json.loads(f.read())
     amz = BN.Amazon(k['amz_access'], k['amz_secret'],
@@ -336,7 +340,7 @@ def check_add_amz_source(media):
               'display_name': 'Amazon',
               'link': soup.find('Item').find('DetailPageURL').text,
               'type': 'subscription_web_sources'}
-    update_media_with_source(media, source)    
+    update_media_with_source(media, source)
 
 
 '''Section for DB calls, including REST API for browser requests'''
@@ -345,8 +349,10 @@ def check_add_amz_source(media):
 def get_media_from_db(mtype, mid):
     return db.Media.find_one({'mtype': mtype, 'id': mid}, {'_id': 0})
 
+
 def db_lookup_via_link(link):
     return db.Media.find_one({'sources.link': link}, {'_id': 0})
+
 
 def insert_media_if_new(media):
     if not db.Media.find_one({'mtype': media['mtype'],
@@ -362,13 +368,13 @@ def update_media_with_source(media, source):
     if not db_media:
         logging.error(u'could not find media to update source')
         return
-    if not 'sources' in db_media:
+    if 'sources' not in db_media:
         logging.error(u'unexpected, db media exists with no sources list')
         return
     if not any(source['name'] in d.values() for d in db_media['sources']):
         db.Media.find_one_and_update({'mtype': media['mtype'],
                                       'id': media['id']},
-            {'$push': {'sources': source}})
+                                     {'$push': {'sources': source}})
         logging.info(u'{} added for: {}'.format(source['name'],
                                                 media['title']))
 
@@ -386,7 +392,7 @@ def insert_user_to_db(new_user):
 
 
 def get_all_watchlist_in_db():
-    wl_cur = db.Users.find({}, {'_id':0, 'watchlist': 1})
+    wl_cur = db.Users.find({}, {'_id': 0, 'watchlist': 1})
     wl_all = [item for wl in wl_cur for item in wl['watchlist']]
     wl_unique = [dict(t) for t in set([tuple(d.items()) for d in wl_all])]
     return wl_unique
@@ -397,7 +403,7 @@ def remove_hulu_addon_media():
     it does not denote this in html (only in an img), so any overlaps
     with both sources will remove hulu as a source'''
     x = db.Media.update_many({'sources.name': {'$all': ['hulu', 'showtime']}},
-                         {'$pull': {'sources': {'name': 'hulu'}}})
+                             {'$pull': {'sources': {'name': 'hulu'}}})
     logging.info('hulu removed from {0!s} db docs'.format(x.matched_count))
     return
 

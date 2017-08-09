@@ -1,22 +1,19 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import sys
 import requests
 import requests_cache
 from bs4 import BeautifulSoup
 import json
-import re
-from pprint import pprint
 import time
 import random
 import logging
 from selenium import webdriver
-from selenium.common.exceptions import (NoSuchElementException, 
+from selenium.common.exceptions import (NoSuchElementException,
                                         StaleElementReferenceException)
 import flaskapp
 
 '''provider_search.py goes to media providers to
-    search for media availability and write to db''' 
+   search for media availability and write to db'''
 
 
 def main():
@@ -27,12 +24,12 @@ def main():
     requests_cache.install_cache('demo_cache')
 
     search_hulu()
-    #search_netflix()
-    #search_hbo()
-    #search_showtime()
-    #update_watchlist_amz()
-    #flaskapp.remove_hulu_addon_media()
-
+    search_netflix()
+    search_showtime()
+    search_hbo()
+    update_watchlist_amz()
+    flaskapp.remove_hulu_addon_media()
+    flaskapp.reindex_database()
 
 def update_watchlist_amz():
     # for all unique watchlist items check if amz is a source and add to db
@@ -88,55 +85,6 @@ def search_hulu():
     logging.info('hulu, clicked profile')
     driver.save_screenshot('static/screenshot2.png')
 
-    '''
-    # MOVIE SEARCH SECTION
-    # get all movie genres
-    driver.get('https://www.hulu.com/movies/genres')
-    time.sleep(1.5)
-    all_genre = driver.find_element_by_id('all_movies_genres')
-    anchors = all_genre.find_elements_by_class_name('beacon-click')
-    genre_pages = [a.get_attribute('href') for a in anchors]
-    logging.info('hulu, got movie genres')
-
-    medias = []
-    for page in genre_pages:
-        if page == 'https://www.hulu.com/latino':  # skip since diff format
-            continue
-        # get page and pointer to top panel, holding about 6 medias
-        try:
-            logging.info('about to get page: ' + page)
-            driver.get(page)
-            time.sleep(6)
-            top_panel = driver.find_element_by_class_name('tray')
-            next_btn = top_panel.find_element_by_class_name('next')
-        except Exception as e:
-            logging.exception('initial load of genre_page')
-            pass
-
-        # get visible media, click next, repeat until no next button
-        while True:
-            try:
-                thumbnails = top_panel.find_elements_by_class_name('row')
-                for t in thumbnails:
-                    title = t.find_element_by_class_name('title')
-                    title = title.get_attribute('innerHTML')
-                    link = t.find_element_by_class_name('beacon-click')
-                    link = link.get_attribute('href')
-                    medias += [{'title': title, 'link': link}]
-                if not next_btn.is_displayed():
-                    break  # exit loop if next button is not displayed
-                next_btn.click()
-                time.sleep(float(random.randrange(1800, 2300, 1))/1000)
-            except Exception as e:
-                logging.exception('processing thumbnails of media')
-                with open('log/selenium_error_dump.txt', 'w') as f:
-                    f.write(str(driver.page_source))
-                #pass
-        logging.info('len(medias) so far: ' + str(len(medias)))
-
-    lookup_and_write_medias(medias, mtype='movie', source=source)
-    '''
-
     def get_medias_from_genre_pages(genre_pages):
         medias = []
         for page in genre_pages:
@@ -145,11 +93,12 @@ def search_hulu():
             if page == 'https://www.hulu.com/latino':
                 continue  # says movie genre but shows not movies
             # get page and pointer to top panel, holding about 6 medias
-            logging.info('about to get page: ' + page)
             driver.get(page)
+            logging.info('did get on page: {}'.format(page))
             time.sleep(8)
             top_panel = driver.find_element_by_class_name('tray')
             next_btn = top_panel.find_element_by_class_name('next')
+            next_counter = 0
 
             # get visible media, click next, repeat until no next button
             while True:
@@ -158,13 +107,14 @@ def search_hulu():
                     try:
                         title = t.find_element_by_class_name('title')
                         title = title.get_attribute('innerHTML')
-                        #logging.info('title in html found: {}'.format(title))
+                        # logging.info('title in html found: {}'.format(title))
                         link = t.find_element_by_class_name('beacon-click')
                         link = link.get_attribute('href')
                         medias += [{'title': title, 'link': link}]
                     except NoSuchElementException:
-                        logging.error('no title in row html, maybe blank')
-                        #with open('log/selenium_error_html_dump.txt', 'w') as f:
+                        logging.warning('no title in row html, blank grid')
+                        # with open('log/selenium_error_html_dump.txt',
+                        #           'w') as f:
                         #    f.write(str(driver.page_source))
                         continue
                     except StaleElementReferenceException:
@@ -173,12 +123,19 @@ def search_hulu():
                 if not next_btn.is_displayed():
                     break  # exit loop if next button is not displayed
                 next_btn.click()
-                logging.info('clicking next')
+                next_counter += 1
+                if next_counter % 10 == 0:
+                    logging.info('clicked next {} times'.format(next_counter))
+                if next_counter >= 120:
+                    logging.error('next button never went away, may have ' +
+                                  'not gotten all media on: {}'.format(page))
+                    break  # exit loop, pages should never be this long
                 time.sleep(float(random.randrange(1900, 2300, 1))/1000)
-        logging.info('len(medias) so far: ' + str(len(medias)))
-        return medias
+            logging.info('len(medias) so far: {}'.format(len(medias)))
+        return medias  #TODO test counter and len(media) placement
 
     # MOVIE SEARCH SECTION
+    logging.info('HULU MOVIE SEARCH')
     driver.get('https://www.hulu.com/movies/genres')
     time.sleep(1.5)
     all_genre = driver.find_element_by_id('all_movies_genres')
@@ -189,6 +146,7 @@ def search_hulu():
     lookup_and_write_medias(medias, mtype='movie', source=source)
 
     # SHOW SEARCH SECTION
+    logging.info('HULU SHOW SEARCH')
     driver.get('https://www.hulu.com/tv/genres')
     time.sleep(1.5)
     all_genre = driver.find_element_by_id('all_tv_genres')
@@ -218,8 +176,35 @@ def search_netflix():
     inputs[0].send_keys('boombox200@gmail.com')
     inputs[1].send_keys('BJUXSkjnD_9t')
     driver.find_element_by_tag_name('button').click()
-    
+    logging.info('netflix, logged in')
+
+    def get_medias_from_genre_pages(genre_pages):
+        medias = []
+        for page in genre_pages:
+            # get page and scroll to bottom many times
+            time.sleep(1.5)
+            driver.get(page)
+            logging.info('did get on page: {}'.format(page))
+            for i in range(40):
+                driver.execute_script(
+                    "window.scrollTo(0, document.body.scrollHeight);")
+                time.sleep(float(random.randrange(900, 1400, 1))/1000)
+
+            # put source into beautifulsoup and get titles
+            soup = BeautifulSoup(driver.page_source, 'html.parser')
+            divs = soup('div', 'ptrack-content')
+            for d in divs:
+                title = d.find('div', 'video-preload-title-label').text
+                elements = d['data-ui-tracking-context'].split(',')
+                vid_element = [i for i in elements if 'video_id' in i]
+                netflix_id = vid_element[0][vid_element[0].find(':')+1:]
+                link = base_url+'/title/'+netflix_id
+                medias += [{'title': title, 'link': link}]
+            logging.info('len(medias) so far: {}'.format(len(medias)))
+        return medias
+
     # MOVIE SEARCH SECTION
+    logging.info('NETFLIX MOVIE SEARCH')
     genre_pages = [
                    'https://www.netflix.com/browse/genre/5977',  # gay
                    'https://www.netflix.com/browse/genre/1365',  # action
@@ -232,71 +217,20 @@ def search_netflix():
                    'https://www.netflix.com/browse/genre/783',  # kid
                    'https://www.netflix.com/browse/genre/7627',  # cult
                    'https://www.netflix.com/browse/genre/6839',  # docs ~1321
-                   'https://www.netflix.com/browse/genre/78367', # internat'l
+                   'https://www.netflix.com/browse/genre/78367',  # internat'l
                    'https://www.netflix.com/browse/genre/8883',  # romance
                    'https://www.netflix.com/browse/genre/1492',  # scifi
                    'https://www.netflix.com/browse/genre/8933'  # thrillers
                   ]
-
-    medias = []
-    for page in genre_pages:
-        # get initial page and scroll to bottom many times
-        try:
-            time.sleep(1.5)
-            driver.get(page)
-        except httplib.BadStatusLine as bsl:
-            logging.error('get page error, will try to pass, msg= ' + bsl.message)
-            pass
-        logging.info('did get on page: ' + page)
-        for i in range(36):
-            driver.execute_script(
-                "window.scrollTo(0, document.body.scrollHeight);")
-            time.sleep(float(random.randrange(90, 140, 1))/100)
-
-        # put source into beautifulsoup and get titles
-        soup = BeautifulSoup(driver.page_source, 'html.parser')
-        divs = soup('div', 'ptrack-content')
-        for d in divs:
-            title = d.find('div', 'video-preload-title-label').text
-            elements = d['data-ui-tracking-context'].split(',')
-            vid_element = [i for i in elements if 'video_id' in i]
-            netflix_id = vid_element[0][vid_element[0].find(':')+1:]
-            link = base_url+'/title/'+netflix_id
-            medias += [{'title': title, 'link': link}]
-        logging.info('len(medias) so far: ' + str(len(medias)))
-
+    medias = get_medias_from_genre_pages(genre_pages)
     lookup_and_write_medias(medias, mtype='movie', source=source)
 
-
     # SHOW SEARCH SECTION
+    logging.info('NETFLIX SHOW SEARCH')
     genre_pages = ['https://www.netflix.com/browse/genre/83']  # tv ~1500
-    medias = []
-    for page in genre_pages:
-        # get initial page and scroll to bottom many times
-        try:
-            time.sleep(1.5)
-            driver.get(page)
-        except httplib.BadStatusLine as bsl:
-            logging.error('get page error, will try to pass, msg= ' + bsl.message)
-            pass
-        logging.info('did get on page: ' + page)
-        for i in range(40):
-            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-            time.sleep(float(random.randrange(90, 140, 1))/100)
-
-        # put source into beautifulsoup and get titles
-        soup = BeautifulSoup(driver.page_source, 'html.parser')
-        divs = soup('div', 'ptrack-content')
-        for d in divs:
-            title = d.find('div', 'video-preload-title-label').text
-            elements = d['data-ui-tracking-context'].split(',')
-            vid_element = [i for i in elements if 'video_id' in i]
-            netflix_id = vid_element[0][vid_element[0].find(':')+1:]
-            link = base_url+'/title/'+netflix_id
-            medias += [{'title': title, 'link': link}]
-        logging.info('len(medias) for page: ' + str(len(medias)))
-
+    medias = get_medias_from_genre_pages(genre_pages)
     lookup_and_write_medias(medias, mtype='show', source=source)
+
     driver.quit()
 
 
@@ -309,6 +243,7 @@ def search_showtime():
               'type': 'subscription_web_sources'}
 
     # MOVIE SEARCH SECTION
+    logging.info('SHOWTIME MOVIE SEARCH')
     r = requests.get(base_url + '/movies')
     soup = BeautifulSoup(r.text, 'html.parser')
 
@@ -334,6 +269,7 @@ def search_showtime():
     catalog = []
     for link in genre_links:
         r = requests.get(base_url + link)
+        logging.info('did get on page: {}'.format(link))
         soup = BeautifulSoup(r.text, 'html.parser')
 
         anchors = soup.find_all('a', {'class': 'movies-gallery__item'})
@@ -342,24 +278,28 @@ def search_showtime():
             title = title[title.find(':')+1:]
             link = base_url + a['href']
             catalog += [{'title': title, 'link': link}]
+    logging.info('will now check avail on {} catalog items'.format(
+                 len(catalog)))
 
     # check availability via link, build medias list
     medias = []
-    for c in catalog:
-        time.sleep(0.25)
-        r = requests.get(c['link'])
+    for c in enumerate(catalog):
+        time.sleep(0.100)
+        r = requests.get(c[1]['link'])
         soup = BeautifulSoup(r.text, 'html.parser')
-        if soup.find(text = 'STREAM THIS MOVIE'):
-            medias += [c]
+        if soup.find(text='STREAM THIS MOVIE'):
+            medias += [c[1]]
+        if c[0] and c[0] % 50 == 0:
+            logging.info(u'checked availability on {} items'.format(c[0]))
 
     lookup_and_write_medias(medias, mtype='movie', source=source)
 
-
     # SHOW SEARCH SECTION
+    logging.info('SHOWTIME SHOW SEARCH')
     r = requests.get(base_url + '/series')
     soup = BeautifulSoup(r.text, 'html.parser')
     all_series = soup.find('section',
-        {'data-context': 'promo group:All Showtime Series'})
+                           {'data-context': 'promo group:All Showtime Series'})
 
     # get all show titles
     medias = []
@@ -381,6 +321,7 @@ def search_hbo():
               'type': 'subscription_web_sources'}
 
     # MOVIE SEARCH SECTION
+    logging.info('HBO MOVIE SEARCH')
     pages = ['http://www.hbo.com/movies/catalog',
              'http://www.hbo.com/documentaries/catalog']
     for page in pages:
@@ -395,21 +336,26 @@ def search_hbo():
 
         # get full movie catalog
         movies = data['content']['navigation']['films']
-        catalog = [{'title': m['title'], 'link': base_url + '/' + m['link']}
-                  for m in movies if m['link']]
+        catalog = [{'title': m['title'],
+                    'link': '{}/{}'.format(base_url, m['link'])}
+                   for m in movies if m['link']]
+        logging.info('will now check avail on {} catalog items'.format(
+             len(catalog)))
 
         # check availability via movie link, build medias list
         medias = []
-        for c in catalog:
-            r = requests.get(c['link'])
+        for c in enumerate(catalog):
+            r = requests.get(c[1]['link'])
             soup = BeautifulSoup(r.text, 'html.parser')
-            if soup.find(text = 'NOW & GO'):
-                medias += [c]
+            if soup.find(text='NOW & GO'):
+                medias += [c[1]]
+            if c[0] and c[0] % 50 == 0:
+                logging.info(u'checked availability on {} items'.format(c[0]))
 
         lookup_and_write_medias(medias, mtype='movie', source=source)
 
-
     # SHOW SEARCH SECTION
+    logging.info('HBO SHOW SEARCH')
     r = requests.get('http://www.hbo.com')
     soup = BeautifulSoup(r.text, 'html.parser')
 
@@ -423,24 +369,28 @@ def search_hbo():
     shows = (data['navigation']['toplevel'][0]['subCategory'][0]['items'] +
              data['navigation']['toplevel'][0]['subCategory'][1]['items'])
     catalog = [{'title': m['name'], 'link': base_url + m['nav']}
-             for m in shows]
+               for m in shows]
+    logging.info('will now check avail on {} catalog items'.format(
+         len(catalog)))
 
     # check availability via link, build medias list
     medias = []
-    for c in catalog:
-        r = requests.get(c['link'])
+    for c in enumerate(catalog):
+        r = requests.get(c[1]['link'])
         soup = BeautifulSoup(r.text, 'html.parser')
-        if soup.find(text = 'NOW & GO'):
-            medias += [c]
+        if soup.find(text='NOW & GO'):
+            medias += [c[1]]
+        if c[0] and c[0] % 50 == 0:
+            logging.info(u'checked availability on {} items'.format(c[0]))
 
     lookup_and_write_medias(medias, mtype='show', source=source)
 
 
 def lookup_and_write_medias(medias, mtype, source):
     # get unique: list of dict into list of tuples, set, back to dict
-    logging.info('len(medias) before take unique: ' + str(len(medias)))
+    logging.info('len(medias) before take unique: {}'.format(len(medias)))
     medias = [dict(t) for t in set([tuple(d.items()) for d in medias])]
-    logging.info('len(medias) after take unique: ' + str(len(medias)))
+    logging.info('len(medias) after take unique: {}'.format(len(medias)))
 
     for m in medias:
         source_to_write = dict(source)
@@ -460,10 +410,12 @@ def lookup_and_write_medias(medias, mtype, source):
 
         # exit iteration if search not complete or no results
         if 'total_results' not in results:
-            logging.error('tmdb search not complete ' + mtype + ': ' + m['title'])
+            logging.error(u'tmdb search not complete for {}: {}'.format(
+                          mtype, m['title']))
             continue
         if results['total_results'] < 1:
-            logging.warning('tmdb 0 results for ' + mtype + ': ' + m['title'])
+            logging.warning(u'tmdb 0 results for {}: {}'.format(
+                            mtype, m['title']))
             continue
 
         # assume top result is best match and use it
@@ -477,7 +429,7 @@ def lookup_and_write_medias(medias, mtype, source):
         else:
             full_media['title'] = full_media['name']
             full_media['year'] = full_media['first_air_date'][:4]
-        logging.info('tmdb found ' + mtype + ': ' + full_media['title'])
+        # logging.info(u'tmdb found {}: {}'.format(mtype, full_media['title']))
 
         # check if titles are not exact match, in future may not append these
         t1 = m['title'].translate({ord(c): None for c in "'’:"})
@@ -485,8 +437,8 @@ def lookup_and_write_medias(medias, mtype, source):
         t2 = full_media['title'].translate({ord(c): None for c in "'’:"})
         t2 = t2.lower().replace('&', 'and')
         if t1 != t2:
-            logging.warning('not exact titles: ' +
-                            full_media['title'] + ' | ' + m['title'])
+            logging.warning(u'not exact titles: {} | {}'.format(
+                            m['title'], full_media['title']))
 
         # write db media if new
         flaskapp.insert_media_if_new(full_media)
@@ -497,17 +449,26 @@ def lookup_and_write_medias(medias, mtype, source):
 
 '''
 =amz searches and issues with multiple approaches:=
-"Clear and Present Danger 1994" = no result, amz moviepage year=null | "Gang ~NY 2002" none amz has 2003 (yr diff)
-"Benjamin Button" the result has year=2009, but amz moviepage year=2008 (as does tmdb), amz only gives rel date that changes
-"Snowden" the result has year=2007, diff product than 2016 movie, false pos unless compare year
+"Clear and Present Danger 1994" = no result, amz moviepage year=null |
+     "Gang ~NY 2002" none amz has 2003 (yr diff)
+"Benjamin Button" the result has year=2009, but amz moviepage year=2008
+    (as does tmdb), amz only gives rel date that changes
+"Snowden" the result has year=2007, diff product than 2016 movie, false pos
+    unless compare year
 "Snowden 2016", no match (good)
-"Deadpool 2016" response is "~Clip: Drawing Deadpool", suggests to compare exact titles
-"Zoolander 2" response is "Zoolander No. 2: The Magnum Edition", suggest to not compare exact titles
+"Deadpool 2016" response is "~Clip: Drawing Deadpool", suggests to compare
+    exact titles
+"Zoolander 2" response is "Zoolander No. 2: The Magnum Edition", suggests
+    to not compare exact titles
 "The Terminator 1984", top result is "Terminator Genisys"
-Title | Keyword director search fixes all above, adds some issues but seem not as big:
--"Creed | Ryan Coogler" has a documentary about the movie as top result w/ no year, false neg
--"The Age of Adaline | Lee Toland Krieger" has no results since director not returned by amz, false neg
--misspelled dir names, fasle negs: "Contract Killer" jet lei, "Terminator Genisys", "Maya the Bee Movie"
+Title | Keyword director search fixes all above, adds some issues but
+    seem not as big:
+-"Creed | Ryan Coogler" has a documentary about the movie as top result
+    w/ no year, false neg
+-"The Age of Adaline | Lee Toland Krieger" has no results since director
+    not returned by amz, false neg
+-misspelled dir names, fasle negs: "Contract Killer" jet lei, "Terminator
+    Genisys", "Maya the Bee Movie"
 '''
 
 
