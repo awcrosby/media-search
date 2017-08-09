@@ -11,6 +11,8 @@ import time
 import random
 import logging
 from selenium import webdriver
+from selenium.common.exceptions import (NoSuchElementException, 
+                                        StaleElementReferenceException)
 import flaskapp
 
 '''provider_search.py goes to media providers to
@@ -24,12 +26,12 @@ def main():
                         level=logging.INFO)
     requests_cache.install_cache('demo_cache')
 
+    search_hulu()
+    #search_netflix()
     #search_hbo()
     #search_showtime()
-    #search_netflix()
-    #search_hulu()
-    update_watchlist_amz()
-    flaskapp.remove_hulu_addon_media()
+    #update_watchlist_amz()
+    #flaskapp.remove_hulu_addon_media()
 
 
 def update_watchlist_amz():
@@ -86,7 +88,7 @@ def search_hulu():
     logging.info('hulu, clicked profile')
     driver.save_screenshot('static/screenshot2.png')
 
-
+    '''
     # MOVIE SEARCH SECTION
     # get all movie genres
     driver.get('https://www.hulu.com/movies/genres')
@@ -98,52 +100,7 @@ def search_hulu():
 
     medias = []
     for page in genre_pages:
-        # get page and pointer to top panel, holding about 6 medias
-        try:
-            logging.info('about to get page: ' + page)
-            driver.get(page)
-            time.sleep(6)
-            top_panel = driver.find_element_by_class_name('tray')
-            next_btn = top_panel.find_element_by_class_name('next')
-        except Exception as e:
-            logging.exception('initial load of genre_page')
-            pass
-
-        # get visible media, click next, repeat until no next button
-        while True:
-            try:
-                thumbnails = top_panel.find_elements_by_class_name('row')
-                for t in thumbnails:
-                    title = t.find_element_by_class_name('title')
-                    title = title.get_attribute('innerHTML')
-                    link = t.find_element_by_class_name('beacon-click')
-                    link = link.get_attribute('href')
-                    medias += [{'title': title, 'link': link}]
-                if not next_btn.is_displayed():
-                    break  # exit loop if next button is not displayed
-                next_btn.click()
-                time.sleep(float(random.randrange(1800, 2300, 1))/1000)
-            except Exception as e:
-                logging.exception('processing thumbnails of media')
-                pass
-        logging.info('len(medias) so far: ' + str(len(medias)))
-
-    import q; q.d()
-    lookup_and_write_medias(medias, mtype='movie', source=source)
-
-
-    # SHOW SEARCH SECTION
-    # get all show genres
-    driver.get('https://www.hulu.com/tv/genres')
-    time.sleep(1.5)
-    all_genre = driver.find_element_by_id('all_tv_genres')
-    anchors = all_genre.find_elements_by_class_name('beacon-click')
-    genre_pages = [a.get_attribute('href') for a in anchors]
-    logging.info('hulu, got tv genres')
-
-    medias = []
-    for page in genre_pages:
-        if page == 'https://www.hulu.com/videogames':
+        if page == 'https://www.hulu.com/latino':  # skip since diff format
             continue
         # get page and pointer to top panel, holding about 6 medias
         try:
@@ -172,11 +129,75 @@ def search_hulu():
                 time.sleep(float(random.randrange(1800, 2300, 1))/1000)
             except Exception as e:
                 logging.exception('processing thumbnails of media')
-                pass
+                with open('log/selenium_error_dump.txt', 'w') as f:
+                    f.write(str(driver.page_source))
+                #pass
         logging.info('len(medias) so far: ' + str(len(medias)))
 
-    import q; q.d()
+    lookup_and_write_medias(medias, mtype='movie', source=source)
+    '''
+
+    def get_medias_from_genre_pages(genre_pages):
+        medias = []
+        for page in genre_pages:
+            if page == 'https://www.hulu.com/videogames':
+                continue
+            if page == 'https://www.hulu.com/latino':
+                continue  # says movie genre but shows not movies
+            # get page and pointer to top panel, holding about 6 medias
+            logging.info('about to get page: ' + page)
+            driver.get(page)
+            time.sleep(8)
+            top_panel = driver.find_element_by_class_name('tray')
+            next_btn = top_panel.find_element_by_class_name('next')
+
+            # get visible media, click next, repeat until no next button
+            while True:
+                thumbnails = top_panel.find_elements_by_class_name('row')
+                for t in thumbnails:
+                    try:
+                        title = t.find_element_by_class_name('title')
+                        title = title.get_attribute('innerHTML')
+                        #logging.info('title in html found: {}'.format(title))
+                        link = t.find_element_by_class_name('beacon-click')
+                        link = link.get_attribute('href')
+                        medias += [{'title': title, 'link': link}]
+                    except NoSuchElementException:
+                        logging.error('no title in row html, maybe blank')
+                        #with open('log/selenium_error_html_dump.txt', 'w') as f:
+                        #    f.write(str(driver.page_source))
+                        continue
+                    except StaleElementReferenceException:
+                        logging.error('missed a title, may need to wait more')
+                        continue
+                if not next_btn.is_displayed():
+                    break  # exit loop if next button is not displayed
+                next_btn.click()
+                logging.info('clicking next')
+                time.sleep(float(random.randrange(1900, 2300, 1))/1000)
+        logging.info('len(medias) so far: ' + str(len(medias)))
+        return medias
+
+    # MOVIE SEARCH SECTION
+    driver.get('https://www.hulu.com/movies/genres')
+    time.sleep(1.5)
+    all_genre = driver.find_element_by_id('all_movies_genres')
+    anchors = all_genre.find_elements_by_class_name('beacon-click')
+    genre_pages = [a.get_attribute('href') for a in anchors]
+    logging.info('hulu, got movie genres')
+    medias = get_medias_from_genre_pages(genre_pages)
+    lookup_and_write_medias(medias, mtype='movie', source=source)
+
+    # SHOW SEARCH SECTION
+    driver.get('https://www.hulu.com/tv/genres')
+    time.sleep(1.5)
+    all_genre = driver.find_element_by_id('all_tv_genres')
+    anchors = all_genre.find_elements_by_class_name('beacon-click')
+    genre_pages = [a.get_attribute('href') for a in anchors]
+    logging.info('hulu, got tv genres')
+    medias = get_medias_from_genre_pages(genre_pages)
     lookup_and_write_medias(medias, mtype='show', source=source)
+
     driver.quit()
 
 
@@ -200,6 +221,7 @@ def search_netflix():
     
     # MOVIE SEARCH SECTION
     genre_pages = [
+                   'https://www.netflix.com/browse/genre/5977',  # gay
                    'https://www.netflix.com/browse/genre/1365',  # action
                    'https://www.netflix.com/browse/genre/5763',  # drama
                    'https://www.netflix.com/browse/genre/7077',  # indie
@@ -210,7 +232,6 @@ def search_netflix():
                    'https://www.netflix.com/browse/genre/783',  # kid
                    'https://www.netflix.com/browse/genre/7627',  # cult
                    'https://www.netflix.com/browse/genre/6839',  # docs ~1321
-                   'https://www.netflix.com/browse/genre/5977',  # gay
                    'https://www.netflix.com/browse/genre/78367', # internat'l
                    'https://www.netflix.com/browse/genre/8883',  # romance
                    'https://www.netflix.com/browse/genre/1492',  # scifi
@@ -278,7 +299,7 @@ def search_netflix():
     lookup_and_write_medias(medias, mtype='show', source=source)
     driver.quit()
 
- 
+
 def search_showtime():
     # source dict to be added to media sources[] in db for found titles
     base_url = 'http://www.sho.com'
@@ -386,7 +407,7 @@ def search_hbo():
                 medias += [c]
 
         lookup_and_write_medias(medias, mtype='movie', source=source)
-    
+
 
     # SHOW SEARCH SECTION
     r = requests.get('http://www.hbo.com')
@@ -422,6 +443,18 @@ def lookup_and_write_medias(medias, mtype, source):
     logging.info('len(medias) after take unique: ' + str(len(medias)))
 
     for m in medias:
+        source_to_write = dict(source)
+
+        # if media link exists, set source link, try link db lookup / update
+        if 'link' in m.keys():
+            source_to_write['link'] = m['link']
+            full_media = flaskapp.db_lookup_via_link(m['link'])
+            if full_media:
+                logging.info(u'media link found in db: {}'.format(m['title']))
+                flaskapp.update_media_with_source(full_media, source_to_write)
+                continue
+
+        # link url was not in database, therefore do themoviedb search
         time.sleep(0.2)
         results = flaskapp.themoviedb_search(m['title'], mtype)
 
@@ -456,18 +489,9 @@ def lookup_and_write_medias(medias, mtype, source):
                             full_media['title'] + ' | ' + m['title'])
 
         # write db media if new
-        flaskapp.insert_media_if_new(full_media)  # TODO test on next scrape
+        flaskapp.insert_media_if_new(full_media)
 
-        # update source with specific media link, if available
-        source_to_write = dict(source)
-        if 'link' in m.keys():
-            source_to_write['link'] = m['link']
-
-        print 'in lookup', source_to_write
-        print 'id: ', full_media['id']
-        print 'full_media', full_media
-
-        # update db media with source    TODO test on next scrape
+        # update db media with source
         flaskapp.update_media_with_source(full_media, source_to_write)
 
 

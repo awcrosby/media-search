@@ -345,6 +345,8 @@ def check_add_amz_source(media):
 def get_media_from_db(mtype, mid):
     return db.Media.find_one({'mtype': mtype, 'id': mid}, {'_id': 0})
 
+def db_lookup_via_link(link):
+    return db.Media.find_one({'sources.link': link}, {'_id': 0})
 
 def insert_media_if_new(media):
     if not db.Media.find_one({'mtype': media['mtype'],
