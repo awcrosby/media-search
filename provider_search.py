@@ -12,6 +12,9 @@ from selenium.common.exceptions import (NoSuchElementException,
                                         StaleElementReferenceException)
 import flaskapp
 
+with open('creds.json', 'r') as f:
+    creds = json.loads(f.read())
+
 '''provider_search.py goes to media providers to
    search for media availability and write to db'''
 
@@ -69,8 +72,8 @@ def search_hulu():
     driver.find_element_by_name('dummy_login').click()
 
     # enter credentials and click login div
-    driver.find_element_by_id('user_email').send_keys('boombox200@gmail.com')
-    driver.find_element_by_id('password').send_keys('4!A$@AV7DG')
+    driver.find_element_by_id('user_email').send_keys(creds['hulu_u'])
+    driver.find_element_by_id('password').send_keys(creds['hulu_p'])
     logging.info('hulu, pasted u/p')
     driver.save_screenshot('static/screenshot.png')
     # driver.find_element_by_id('recaptcha_response_field').send_keys('')
@@ -173,8 +176,8 @@ def search_netflix():
     driver.set_window_size(1920, 1080)
     driver.get('https://www.netflix.com/login')
     inputs = driver.find_elements_by_tag_name('input')
-    inputs[0].send_keys('boombox200@gmail.com')
-    inputs[1].send_keys('BJUXSkjnD_9t')
+    inputs[0].send_keys(creds['nf_u'])
+    inputs[1].send_keys(creds['nf_p'])
     driver.find_element_by_tag_name('button').click()
     logging.info('netflix, logged in')
 

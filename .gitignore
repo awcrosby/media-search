@@ -9,7 +9,7 @@ demo_cache.sqlite
 
 # Secure #
 ###################
-apikeys.json
+creds.json
 
 # Other #
 ###################

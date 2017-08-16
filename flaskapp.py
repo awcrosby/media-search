@@ -42,6 +42,13 @@ def init_database():
 def reindex_database():
     db.Media.reindex()
 
+
+@app.after_request
+def add_header(response):
+    response.cache_control.max_age = 360
+    return response
+
+
 # check if users logged in
 def is_logged_in(f):
     @wraps(f)
@@ -206,7 +213,7 @@ def search(mtype='movie', query=''):
 # search themoviedb via user query or scraped title
 def themoviedb_search(query, mtype):
     tmdb_url = 'https://api.themoviedb.org/3/search/'
-    with open('apikeys.json', 'r') as f:
+    with open('creds.json', 'r') as f:
         params = {'api_key': json.loads(f.read())['tmdb']}
 
     # if year is in query, remove and use as search param
@@ -246,7 +253,7 @@ def mediainfo(mtype='', mid=None):
 
 # lookup themoviedb media via id
 def themoviedb_lookup(mtype, id):
-    with open('apikeys.json', 'r') as f:
+    with open('creds.json', 'r') as f:
         params = {'api_key': json.loads(f.read())['tmdb'],
                   'append_to_response': 'credits'}
     tmdb_url = ('https://api.themoviedb.org/3/movie/' if mtype == 'movie'
@@ -285,7 +292,7 @@ def check_add_amz_source(media):
                      title, director))
     else:
         logging.info(u'searching amz for show {}'.format(title))
-    with open('apikeys.json', 'r') as f:
+    with open('creds.json', 'r') as f:
         k = json.loads(f.read())
     amz = BN.Amazon(k['amz_access'], k['amz_secret'],
                     k['amz_associate_tag'], MaxQPS=0.9)
@@ -358,7 +365,7 @@ def insert_media_if_new(media):
     if not db.Media.find_one({'mtype': media['mtype'],
                               'id': media['id']}):
         db.Media.insert_one(media)
-        logging.info(u'db wrote new media: ' + media['title'])
+        logging.info(u'db wrote new media: {}'.format(media['title']))
     return
 
 
@@ -399,9 +406,9 @@ def get_all_watchlist_in_db():
 
 
 def remove_hulu_addon_media():
-    '''on browse of hulu, for media requiring addons (i.e. showtime)
-    it does not denote this in html (only in an img), so any overlaps
-    with both sources will remove hulu as a source'''
+    '''on browse of hulu, for media requiring addons (i.e. showtime) it does
+    not denote this in html (only in an img), so any overlaps with both
+    sources will remove hulu as a source, called from provider_search.py'''
     x = db.Media.update_many({'sources.name': {'$all': ['hulu', 'showtime']}},
                              {'$pull': {'sources': {'name': 'hulu'}}})
     logging.info('hulu removed from {0!s} db docs'.format(x.matched_count))
