@@ -38,6 +38,8 @@ parser = reqparse.RequestParser()
 def init_database():
     db.Media.create_index([('mtype', pymongo.ASCENDING),
                            ('id', pymongo.ASCENDING)], unique=True)
+    db.Users.create_index('email', unique=True)
+
 
 def reindex_database():
     db.Media.reindex()
@@ -105,7 +107,7 @@ def register():
             flash('You are now registered and can log in', 'success')
             return redirect(url_for('login'))
         else:
-            flash('That email is already registered', 'danger')
+            flash('Error - email may already be registered', 'danger')
     return render_template('register.html', form=form)
 
 
