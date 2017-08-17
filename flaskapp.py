@@ -431,6 +431,13 @@ def delFromWatchlist(mtype=None, mid=None):
     return redirect(url_for('display_watchlist'))
 
 
+# REST-like API, HTTP DELETE to delete item, for js in future
+class WlistDelAPI(Resource):
+    def delete(self, mtype, mid, email):
+        flash('DELETE API function called', 'success')
+        return redirect(url_for('display_watchlist'))
+
+
 # REST-like API, post via browser, get only by unittest now, js in future
 class WatchlistAPI(Resource):
     decorators = [is_logged_in]
@@ -464,6 +471,7 @@ class WatchlistAPI(Resource):
 
 
 # set up api resource routing
+api.add_resource(WlistDelAPI, '/api/watchlist_del')
 api.add_resource(WatchlistAPI, '/api/watchlist')
 
 
