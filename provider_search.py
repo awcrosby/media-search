@@ -34,6 +34,7 @@ def main():
     flaskapp.remove_hulu_addon_media()
     flaskapp.reindex_database()
 
+
 def update_watchlist_amz():
     # for all unique watchlist items check if amz is a source and add to db
     wl_unique = flaskapp.get_all_watchlist_in_db()
@@ -64,25 +65,20 @@ def search_hulu():
     time.sleep(1.2)
     logging.info('hulu, clicked on log in link')
 
-    # switch to pop-up iframe with login info
-    iframe = driver.find_element_by_id('login-iframe')
-    driver.switch_to_frame(iframe)
-
-    # click on dummy input to make real input visible
-    driver.find_element_by_name('dummy_login').click()
-
-    # enter credentials and click login div
-    driver.find_element_by_id('user_email').send_keys(creds['hulu_u'])
-    driver.find_element_by_id('password').send_keys(creds['hulu_p'])
+    # enter credentials and click login button
+    popup = driver.find_element_by_id('login-popup-section')
+    form = popup.find_element_by_tag_name('form')
+    email_input = form.find_elements_by_tag_name('input')[0]
+    pw_input = form.find_elements_by_tag_name('input')[1]
+    email_input.send_keys(creds['hulu_u'])
+    pw_input.send_keys(creds['hulu_p'])
     logging.info('hulu, pasted u/p')
     driver.save_screenshot('static/screenshot.png')
     # driver.find_element_by_id('recaptcha_response_field').send_keys('')
-    login_anchor = driver.find_element_by_class_name('login')
-    login_anchor.find_element_by_tag_name('div').click()
+    form.find_element_by_tag_name('button').click()
     time.sleep(1.2)
 
     # switch out of iframe and click profile link
-    driver.switch_to_default_content()
     driver.find_element_by_id('98994228').click()
     time.sleep(1.2)
     logging.info('hulu, clicked profile')
