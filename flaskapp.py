@@ -45,10 +45,10 @@ def reindex_database():
     db.Media.reindex()
 
 
-@app.after_request
-def add_header(response):
-    response.cache_control.max_age = 360
-    return response
+#@app.after_request  # attempt to add headers, but didnt update page on change
+#def add_header(response):
+#    response.cache_control.max_age = 360
+#    return response
 
 
 # check if users logged in

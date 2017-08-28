@@ -226,7 +226,17 @@ def search_netflix():
 
     # SHOW SEARCH SECTION
     logging.info('NETFLIX SHOW SEARCH')
-    genre_pages = ['https://www.netflix.com/browse/genre/83']  # tv ~1500
+    genre_pages = [
+                   'https://www.netflix.com/browse/genre/83',  # tv popular
+                   'https://www.netflix.com/browse/genre/10673',  # action
+                   'https://www.netflix.com/browse/genre/10375',  # com
+                   'https://www.netflix.com/browse/genre/11714',  # drama
+                   'https://www.netflix.com/browse/genre/83059',  # horror
+                   'https://www.netflix.com/browse/genre/4366',  # mystery
+                   'https://www.netflix.com/browse/genre/52780',  # sci
+                   'https://www.netflix.com/browse/genre/4814',  # miniseries
+                   'https://www.netflix.com/browse/genre/46553'  # classic
+                  ]
     medias = get_medias_from_genre_pages(genre_pages)
     lookup_and_write_medias(medias, mtype='show', source=source)
 
