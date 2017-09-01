@@ -7,28 +7,26 @@
 
   {% raw %}
     <div id="vueapp">
+      <button v-on:click="toggleNoSources()">Hide/show media with no sources</button>
       <div v-if="wlist.length == 0">
         <h3>Watchlist empty... search and add</h3>
       </div>
       <div v-else class="panel panel-default">
         <table class="table table-condensed table-striped">
           <tr>
-            <th class="col-md-1"></th>
-            <th class="col-md-4">Title</th>
-            <th class="col-md-4">Sources</th>
-            <th class="col-md-3"></th>
+            <th class="col-md-1"></th>  <th class="col-md-4">Title</th>  <th class="col-md-4">Sources</th>  <th class="col-md-3"></th>
           </tr>
-          <tr v-for="w in wlist">
-            <td v-if="w.mtype == 'show'"><img class="icon" src="static/glyphicon-tv.png" alt="tv icon" /></td>
-            <td v-else><img class="icon" src="static/glyphicon-film.png" alt="film icon" /></td>
-            <td>{{ w.title }}</td>
-            <td>
-              <span v-for="s in w.sources">
-                <a :href="s.link">{{ s.display_name }}</a> &nbsp;
-              </span>
-            </td>
-            <td><a :href="'/watchlist/delete/' + w.mtype + '/' + w.id">Delete</a></td>
-          </tr>
+          <template v-for="w in wlist">
+            <tr :class="{hasNoSource0: !check_if_source(w)}">
+              <td v-if="w.mtype == 'show'"><img class="icon" src="static/glyphicon-tv.png" alt="tv icon" /></td>
+              <td v-else><img class="icon" src="static/glyphicon-film.png" alt="film icon" /></td>
+              <td>{{ w.title }}</td>
+              <td>
+                <span v-for="s in w.sources"> <a :href="s.link">{{ s.display_name }}</a> &nbsp; </span>
+              </td>
+              <td><a :href="'/watchlist/delete/' + w.mtype + '/' + w.id">Delete</a></td>
+            </tr>
+          </template>
         </table>
       </div>
     </div>
@@ -40,6 +38,21 @@
             el: "#vueapp",
             data: {
                 wlist: watchlist
+            },
+            methods: {
+                toggleNoSources: function() {
+                    if ($('.hasNoSource0').css('display') == 'none') {
+                        $('.hasNoSource0').css('display', '');
+                    } else {
+                        $('.hasNoSource0').css('display', 'none');
+                    }
+                },
+                check_if_source: function(w) {
+                    return (w.sources.length > 0);
+                },
+                myalert: function() {
+                    alert('Here is that alert');
+                }
             }
         });
     </script>

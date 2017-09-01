@@ -161,6 +161,7 @@ def display_watchlist():
                  ['title', 'sources', 'mtype', 'year', 'id']}
             wl_detail.append(m)
         else:  # if db lookup did not return data for the item
+            item['sources'] = []
             wl_detail.append(item)
 
     watchlist = json.dumps(wl_detail)
@@ -252,10 +253,10 @@ def mediainfo(mtype='', mid=None):
     # get media from db to check for sources
     db_media = get_media_from_db(mtype, mid)
 
-    # set media to be from db if exists, or from api
-    #media = db_media if db_media else api_media
+    # set media to be combo of api and whatever in db
     media = api_media.copy()
-    media.update(db_media)
+    if db_media:
+        media.update(db_media)
 
     # get json version of sources for javascript to use 
     sources = json.dumps(media['sources'])
