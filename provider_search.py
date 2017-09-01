@@ -53,9 +53,11 @@ def search_hulu():
               'type': 'subscription_web_sources'}
 
     # go to hulu splash page
-    driver = webdriver.PhantomJS()
+    driver = webdriver.PhantomJS(service_log_path='log/phantomjs.log')
     driver.implicitly_wait(10)  # seconds
     driver.set_window_size(1920, 1080)
+    #driver.get('http://gss--c.na7.visual.force.com/')
+    #import q; q.d()
     driver.get('https://www.hulu.com')
     time.sleep(1.2)
 
@@ -167,7 +169,7 @@ def search_netflix():
               'type': 'subscription_web_sources'}
 
     # log in to provider
-    driver = webdriver.PhantomJS()
+    driver = webdriver.PhantomJS(service_log_path='log/phantomjs.log')
     driver.implicitly_wait(10)  # seconds
     driver.set_window_size(1920, 1080)
     driver.get('https://www.netflix.com/login')

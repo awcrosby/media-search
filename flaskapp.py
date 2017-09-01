@@ -237,20 +237,26 @@ def mediainfo(mtype='', mid=None):
         abort(400)
 
     # get summary info from themoviedb api, exit if not found
-    media = themoviedb_lookup(mtype, mid)
-    if not media:
+    api_media = themoviedb_lookup(mtype, mid)
+    if not api_media:
         flash('Media id not found', 'danger')
         return redirect(url_for('home'))
 
     # check if this title/year avail on amz, if so write to db
-    check_add_amz_source(media)
+    check_add_amz_source(api_media, category='prime')
+    check_add_amz_source(api_media, category='pay')
 
-    # TODO if this has result send this to template else send above media
     # get media from db to check for sources
     db_media = get_media_from_db(mtype, mid)
 
-    return render_template('mediainfo.html', media=db_media,
-                           mtype=mtype, summary=media)
+    # set media to be from db if exists, or from api
+    media = db_media if db_media else api_media
+
+    # get json version of sources for javascript to use 
+    sources = json.dumps(media['sources'])
+
+    return render_template('mediainfo.html', media=media,
+                           mtype=mtype, sources=sources)
 
 
 # lookup themoviedb media via id
@@ -277,7 +283,7 @@ def themoviedb_lookup(mtype, id):
     return media
 
 
-def check_add_amz_source(media):
+def check_add_amz_source(media, category):
     # prepare for amz api search
     title = media['title']
     year = media['year']
@@ -300,19 +306,29 @@ def check_add_amz_source(media):
                     k['amz_associate_tag'], MaxQPS=0.9)
     # https://github.com/lionheart/bottlenose/blob/master/README.md
 
+    # set parameters to use function as prime or pay
+    if category == 'prime':
+        browse_node = '2676882011'
+        source_name = 'amazon'
+        source_display = 'Amazon(Prime)'
+    elif category == 'pay':
+        browse_node = '2858778011'
+        source_name = 'amazon_pay'
+        source_display = 'Amazon(Pay)'
+
     # search amz with themoviedb info
     if mtype == 'movie':
         results = amz.ItemSearch(
             SearchIndex='Movies',
             ResponseGroup='ItemAttributes',  # type of response
-            BrowseNode='2676882011',  # product type of prime video
+            BrowseNode=browse_node,  # product type of prime video
             Title=title,
             Keywords=director)
     else:
         results = amz.ItemSearch(
             SearchIndex='Movies',
             ResponseGroup='ItemAttributes,RelatedItems',  # type of response
-            BrowseNode='2676882011',  # product type of prime video
+            BrowseNode=browse_node,  # product type of prime video
             RelationshipType='Episode',  # necessary to get show title
             Title=title)
 
@@ -322,16 +338,16 @@ def check_add_amz_source(media):
         logging.info(u'amz api no match: {}'.format(title))
         return
 
-    # get title from first result
+    # exit if missing data and log match
     if mtype == 'movie':
         if not soup.find('Item').find('ReleaseDate'):
-            logging.info(u'amz api issue no rel yr: {}'.format(title))
+            logging.warning(u'amz api issue no rel yr: {}'.format(title))
             return  # likely means this result is obscure
         amz_title = soup.find('Item').find('Title').text  # title of 1st result
         amz_year = soup.find('Item').find('ReleaseDate').text[:4]
     else:
         if not len(soup.find('Item').find_all('Title')) > 1:
-            logging.info(u'amz api issue no title: {}'.format(title))
+            logging.warning(u'amz api issue no title: {}'.format(title))
             # show: Daniel Tiger's Neighborhood has only 1 title, so false neg
             return
         amz_title = soup.find('Item').find_all('Title')[1].text
@@ -345,8 +361,8 @@ def check_add_amz_source(media):
     insert_media_if_new(media)
 
     # update db media with source
-    source = {'name': 'amazon',
-              'display_name': 'Amazon',
+    source = {'name': source_name,
+              'display_name': source_display,
               'link': soup.find('Item').find('DetailPageURL').text,
               'type': 'subscription_web_sources'}
     update_media_with_source(media, source)
