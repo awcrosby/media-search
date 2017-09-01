@@ -157,12 +157,15 @@ def display_watchlist():
     for item in user['watchlist']:
         full_media = get_media_from_db(item['mtype'], int(item['id']))
         if full_media:
-            wl_detail.append(full_media)
+            m = {k:v for (k,v) in full_media.items() if k in
+                 ['title', 'sources', 'mtype', 'year', 'id']}
+            wl_detail.append(m)
         else:  # if db lookup did not return data for the item
             wl_detail.append(item)
 
+    watchlist = json.dumps(wl_detail)
     print('time to get media of full watchlist: {}'.format(time.time()-start))
-    return render_template('watchlist.html', medias=wl_detail, mtype=mtype)
+    return render_template('watchlist.html', medias=wl_detail, watchlist=watchlist, mtype=mtype)
 
 
 # send user query to themoviedb api and return results or single mediainfo.html

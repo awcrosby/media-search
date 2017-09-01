@@ -2,44 +2,46 @@
 {% set active_page = 'watchlist' %}
 
 {% block body %}
-    {% include 'includes/_searchbar.html' %}
+  {% include 'includes/_searchbar.html' %}
+  <div class="clearfix" style="margin-top: 20px;"></div>
 
-    {% if not medias %}<br><h3>Watchlist empty... search and add</h3>{% endif %}
+  {% raw %}
+    <div id="vueapp">
+      <div v-if="wlist.length == 0">
+        <h3>Watchlist empty... search and add</h3>
+      </div>
+      <div v-else class="panel panel-default">
+        <table class="table table-condensed table-striped">
+          <tr>
+            <th class="col-md-1"></th>
+            <th class="col-md-4">Title</th>
+            <th class="col-md-4">Sources</th>
+            <th class="col-md-3"></th>
+          </tr>
+          <tr v-for="w in wlist">
+            <td v-if="w.mtype == 'show'"><img class="icon" src="static/glyphicon-tv.png" alt="tv icon" /></td>
+            <td v-else><img class="icon" src="static/glyphicon-film.png" alt="film icon" /></td>
+            <td>{{ w.title }}</td>
+            <td>
+              <span v-for="s in w.sources">
+                <a :href="s.link">{{ s.display_name }}</a> &nbsp;
+              </span>
+            </td>
+            <td><a :href="'/watchlist/delete/' + w.mtype + '/' + w.id">Delete</a></td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  {% endraw %}
 
-    <div class="clearfix" style="margin-bottom: 20px"></div>
-
-    <div class="panel panel-default">
-    <table class="table table-condensed table-striped">
-      <tr>
-        <th class="col-md-1"></th>
-        <th class="col-md-4">Title</th>
-        <th class="col-md-4">Sources</th>
-        <th class="col-md-3"></th>
-      </tr>
-      {% for m in medias %}
-        <tr>
-          <td>
-            {% if m['mtype'] == 'show' %}
-                <img class="icon" src="static/glyphicon-tv.png" alt="tv icon" />
-                <!-- {{ '\U0001F4FA' }} -->
-            {% else %}
-                <img class="icon" src="static/glyphicon-film.png" alt="film icon" />
-                <!-- {{ '\U0001F3A5' }} -->
-            {% endif %}
-          </td>
-          <td>{{ m['title'] }}</td>
-          <td>
-            {% for s in m['sources'] %}
-                  <a href={{ s['link'] }}>{{ s['display_name'] }}</a> &nbsp;
-            {% endfor %}
-          </td>
-          <td>
-            <!-- delete link that removes media item from watchlist -->
-            <a href="/watchlist/delete/{{m['mtype']}}/{{m['id']}}">Delete</a>
-          </td>
-        </tr>
-      {% endfor %}
-    </table>
-    </div> <!-- panel div -->
+    <script>
+        var watchlist = {{ watchlist|safe }};
+        new Vue({
+            el: "#vueapp",
+            data: {
+                wlist: watchlist
+            }
+        });
+    </script>
 
 {% endblock %}

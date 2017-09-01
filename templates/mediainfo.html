@@ -1,8 +1,7 @@
 {% extends 'layout.html' %}
 
 {% block body %}
-    <h4>Find if a movie/show is streaming on Netflix, HBO, Hulu, Amazon Prime, or Showtime</h4>
-
+    {% include 'includes/_header.html' %}
     {% include 'includes/_searchbar.html' %}
 
     {% set img_base_url = 'https://image.tmdb.org/t/p/w154' %}
