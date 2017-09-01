@@ -253,7 +253,9 @@ def mediainfo(mtype='', mid=None):
     db_media = get_media_from_db(mtype, mid)
 
     # set media to be from db if exists, or from api
-    media = db_media if db_media else api_media
+    #media = db_media if db_media else api_media
+    media = api_media.copy()
+    media.update(db_media)
 
     # get json version of sources for javascript to use 
     sources = json.dumps(media['sources'])
@@ -344,19 +346,29 @@ def check_add_amz_source(media, category):
     # exit if missing data and log match
     if mtype == 'movie':
         if not soup.find('Item').find('ReleaseDate'):
-            logging.warning(u'amz api issue no rel yr: {}'.format(title))
+            logging.warning(u'{} api issue no rel yr: {}'.format(source_name, title))
             return  # likely means this result is obscure
         amz_title = soup.find('Item').find('Title').text  # title of 1st result
         amz_year = soup.find('Item').find('ReleaseDate').text[:4]
     else:
         if not len(soup.find('Item').find_all('Title')) > 1:
-            logging.warning(u'amz api issue no title: {}'.format(title))
+            logging.warning(u'{} api issue no title: {}'.format(source_name, title))
             # show: Daniel Tiger's Neighborhood has only 1 title, so false neg
             return
         amz_title = soup.find('Item').find_all('Title')[1].text
         pos_season = amz_title.find('Season') - 1
         amz_title = amz_title[:pos_season].rstrip('- ')
         amz_year = ''  # not used to compare, can't easily get 1st release date
+
+        t1 = title.translate({ord(c): None for c in "'’:"})
+        t1 = t1.lower().replace('&', 'and')
+        t2 = amz_title.translate({ord(c): None for c in "'’:"})
+        t2 = t2.lower().replace('&', 'and')
+        if t1 != t2:
+            # title mismatch on show worse than movie since no director search
+            logging.warning(u'{} api issue show title mismatch, '
+                            'tmdb:{}, amz:{}'.format(source_name, title, amz_title))
+            return
     logging.info(u'amz api match: {}: amz{}, tmdb{}'.format(
         title, amz_year, year))
 

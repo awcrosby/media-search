@@ -40,7 +40,8 @@ def update_watchlist_amz():
     wl_unique = flaskapp.get_all_watchlist_in_db()
     for m in wl_unique:
         media = flaskapp.themoviedb_lookup(m['mtype'], m['id'])
-        flaskapp.check_add_amz_source(media)
+        flaskapp.check_add_amz_source(media, category='prime')
+        flaskapp.check_add_amz_source(media, category='pay')
         time.sleep(1.1)
     return
 
