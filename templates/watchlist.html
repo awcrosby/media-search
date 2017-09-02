@@ -7,7 +7,9 @@
 
   {% raw %}
     <div id="vueapp">
-      <button v-on:click="toggleNoSources()">Hide/show media with no sources</button>
+      <input type="checkbox" v-model="hideNoSources" @change=toggleNoSources()> Hide media with no sources
+      &nbsp; &nbsp;
+      <input type="checkbox" v-model="hideAmzPay" @change="toggleAmzPay()"> Hide Amazon Pay sources<br>
       <div v-if="wlist.length == 0">
         <h3>Watchlist empty... search and add</h3>
       </div>
@@ -17,12 +19,18 @@
             <th class="col-md-1"></th>  <th class="col-md-4">Title</th>  <th class="col-md-4">Sources</th>  <th class="col-md-3"></th>
           </tr>
           <template v-for="w in wlist">
-            <tr :class="{hasNoSource0: !check_if_source(w)}">
+            <tr :class="sourceClasses(w)">
               <td v-if="w.mtype == 'show'"><img class="icon" src="static/glyphicon-tv.png" alt="tv icon" /></td>
               <td v-else><img class="icon" src="static/glyphicon-film.png" alt="film icon" /></td>
               <td>{{ w.title }}</td>
               <td>
-                <span v-for="s in w.sources"> <a :href="s.link">{{ s.display_name }}</a> &nbsp; </span>
+                <span v-for="s in w.sources" :class="{amzPay: (s.name=='amazon_pay')}">
+                  <a :href="s.link">
+                    <img class="icon" :src="'static/' + s.name + '_favicon.ico'" alt="" />
+                    <span v-if="s.name=='amazon_pay'">$</span>
+                  </a>
+                  &nbsp;
+                </span>
               </td>
               <td><a :href="'/watchlist/delete/' + w.mtype + '/' + w.id">Delete</a></td>
             </tr>
@@ -37,21 +45,37 @@
         new Vue({
             el: "#vueapp",
             data: {
-                wlist: watchlist
+                wlist: watchlist,
+                hideNoSources: false,
+                hideAmzPay: false
             },
             methods: {
-                toggleNoSources: function() {
-                    if ($('.hasNoSource0').css('display') == 'none') {
-                        $('.hasNoSource0').css('display', '');
-                    } else {
-                        $('.hasNoSource0').css('display', 'none');
+                sourceClasses: function(w) {
+                    return {
+                        noSource: (w.sources.length == 0),
+                        noSubSource: ((w.sources.length == 1) && (w.sources[0].name == 'amazon_pay'))
                     }
                 },
-                check_if_source: function(w) {
-                    return (w.sources.length > 0);
+                toggleNoSources: function() {
+                    if (this.hideNoSources) {
+                        $('.noSource').css('display', 'none');
+                        if (this.hideAmzPay) {
+                            $('.noSubSource').css('display', 'none');
+                        } else {
+                            $('.noSubSource').css('display', '');
+                        };
+                    } else {
+                        $('.noSource').css('display', '');
+                        $('.noSubSource').css('display', '');
+                    };
                 },
-                myalert: function() {
-                    alert('Here is that alert');
+                toggleAmzPay: function() {
+                    if (this.hideAmzPay) {
+                        $('.amzPay').css('display', 'none');
+                    } else {
+                        $('.amzPay').css('display', '');
+                    };
+                    this.toggleNoSources();
                 }
             }
         });
