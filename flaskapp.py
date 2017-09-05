@@ -205,10 +205,10 @@ def search(mtype='movie', query=''):
     # if just one has results, go directly to media info page
     elif len(sh['results']) == 0 and len(mv['results']) == 1:
         return redirect(url_for('mediainfo', mtype='movie',
-                                mid=mv['results'][0]['id']))
+                                mid=mv['results'][0]['id'], q=query))
     elif len(mv['results']) == 0 and len(sh['results']) == 1:
         return redirect(url_for('mediainfo', mtype='show',
-                                mid=sh['results'][0]['id']))
+                                mid=sh['results'][0]['id'], q=query))
 
     # display multiple results (without sources) for user to choose
     else:
@@ -237,6 +237,10 @@ def themoviedb_search(query, mtype):
 # lookup via media id for mediainfo.html
 @app.route('/<mtype>/id/<int:mid>', methods=['GET'])
 def mediainfo(mtype='', mid=None):
+    query = request.args.get('q')  # can be string or NoneType
+    if not query:
+        query = ''
+
     if mtype not in ['movie', 'show']:
         abort(400)
 
@@ -262,7 +266,7 @@ def mediainfo(mtype='', mid=None):
     sources = json.dumps(media['sources'])
 
     return render_template('mediainfo.html', media=media,
-                           mtype=mtype, sources=sources)
+                           mtype=mtype, sources=sources, query=query)
 
 
 # lookup themoviedb media via id
@@ -508,5 +512,4 @@ api.add_resource(WatchlistAPI, '/api/watchlist')
 
 
 if __name__ == "__main__":
-    app.secret_key = '3d6gtrje6d2rffe2jqkv'
     app.run(host='0.0.0.0', port=8181)

@@ -17,7 +17,7 @@
       {% for mv in movies['results'][:3] %}
           <div class="col-md-2">
             <div>Movie:</div>
-            <a href="{{ url_for('mediainfo', mtype='movie', mid=mv['id']) }}">
+            <a href="{{ url_for('mediainfo', mtype='movie', mid=mv['id']) + '?q=' + query }}">
               <img src="{{ img_base_url + mv['poster_path'] }}">
               <div>{{ mv['title'] }} ({{ mv['release_date'][:4] }})</div>
             </a>
@@ -29,7 +29,7 @@
       {% for sh in shows['results'][:3] %}
           <div class="col-md-2">
             <div>Show:</div>
-            <a href="{{ url_for('mediainfo', mtype='show', mid=sh['id']) }}">
+            <a href="{{ url_for('mediainfo', mtype='show', mid=sh['id']) + '?q=' + query }}">
               <img src="{{ img_base_url + sh['poster_path'] }}">
               <div>{{ sh['name'] }} ({{ sh['first_air_date'][:4] }})</div>
             </a>
