@@ -1,0 +1,13 @@
+[Unit]
+Description=Gunicorn instance to serve media-search
+After=network.target
+
+[Service]
+User=awcrosby
+Group=www-data
+WorkingDirectory=/home/awcrosby/media-search
+Environment="PATH=/home/awcrosby/media-search/venv/bin"
+ExecStart=/home/awcrosby/media-search/venv/bin/gunicorn --workers 4 --bind unix:media-search.sock -m 007 wsgi:app
+
+[Install]
+WantedBy=multi-user.target
