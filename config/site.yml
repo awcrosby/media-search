@@ -1,18 +1,12 @@
-# prereqs:
-  # sudo adduser awcrosby
-  # sudo usermod -aG sudo awcrosby
-  # ssh-keygen
-  # ssh-copy-id awcrosby@localhost
-- hosts: myhost
+- hosts: myhost  # playbook to setup system as root
   vars:
-    githubuser: awcrosby@gmail.com
-    githubpw: 4sPje$4V~e4J
+    services:
+      - mongodb.service
+      - media-search.service
+  become: true
   tasks:
-    #TODO - name: ensure password auth off: /etc/ssh/sshd_config make sure PasswordAuthentication no ... https://www.digitalocean.com/community/tutorials/initial-server-setup-with-ubuntu-16-04
-    - name: Update all packages to the latest version
-      apt: upgrade=dist
-      become: true
-    #TODO - name: Setup apt-cron to run updates at 4am ... sudo apt-get install cron-apt
+    - name: Updates package lists for upgrades/new pkg, then upgrades all current packages to the latest version
+      apt: upgrade=dist update_cache=yes
     - name: Install latest version of packages
       package: name="{{item}}" state=latest
       with_items:
@@ -20,17 +14,35 @@
         - virtualenv
         - git
         - nginx
-        - fail2ban  # TODO configure to ssh, and maybe http-nginx
-      become: true
+        - fail2ban
+    - name: Add mongodb repo apt_key
+      apt_key: keyserver=hkp://keyserver.ubuntu.com:80 id=EA312927
+    - name: Add mongodb sources list
+      shell: "echo 'deb http://repo.mongodb.org/apt/ubuntu xenial/mongodb-org/3.2 multiverse' | sudo tee /etc/apt/sources.list.d/mongodb-org-3.2.list"
+      changed_when: false
+    - name: Update repositories cache and install "mongodb-org" package
+      apt: name=mongodb-org update_cache=yes
     - name: Firewall turn on and allow OpenSSH
       ufw: rule=allow name=OpenSSH state=enabled
-      become: true
     - name: Firewall allow nginx  # should be deleted after manual ssl install
       ufw: rule=allow name="Nginx HTTP"
-      become: true
     - name: Firewall allow nginx
       ufw: rule=allow name="Nginx HTTPS"
-      become: true
+    - name: Copy services
+      copy:
+        src: /home/awcrosby/media-search/config/{{item}}
+        dest: /etc/systemd/system/{{item}}
+      with_items: "{{services}}"
+    - name: Start and enable on startup the services
+      service: name="{{item}}" state=started enabled=yes
+      with_items: "{{services}}"
+- hosts: myhost  # playbook to setup code environment
+  vars:
+    githubuser: awcrosby@gmail.com
+    services:
+      - nginx
+      - fail2ban
+  tasks:
     - name: Make project directory
       file: path=/home/awcrosby/media-search/ state=directory
     - name: Git clone media-search repo
@@ -41,41 +53,17 @@
       pip:
         requirements: /home/awcrosby/media-search/requirements.txt
         virtualenv: /home/awcrosby/media-search/venv
-- hosts: myhost
-  tasks:
-    - name: Add mongodb repo apt_key
-      apt_key: keyserver=hkp://keyserver.ubuntu.com:80 id=EA312927
-      become: true
-    - name: Add mongodb sources list
-      shell: "echo 'deb http://repo.mongodb.org/apt/ubuntu xenial/mongodb-org/3.2 multiverse' | sudo tee /etc/apt/sources.list.d/mongodb-org-3.2.list"
-      changed_when: false
-    - name: Update repositories cache and install "mongodb-org" package
-      apt: name=mongodb-org update_cache=yes
-      become: true
-    - name: Create mongodb.service
-      copy:
-        src: /home/awcrosby/media-search/config/mongodb.service
-        dest: /etc/systemd/system/mongodb.service
-      become: true
-    - name: Start and enable on startup the mongodb.service
-      service:
-        name: mongodb.service
-        state: started
-        enabled: yes
-      become: true
-    - name: Create web app service to auto start gunicorn
-      copy:
-        src: /home/awcrosby/media-search/config/media-search.service
-        dest: /etc/systemd/system/media-search.service
-      become: true
-    - name: Start and enable on startup the media-search.service
-      service: name=media-search.service state=started enabled=yes
-      become: true
     - name: Copy nginx config to replace the default
       copy:
         src: /home/awcrosby/media-search/config/nginx_config_pre_ssl
         dest: /etc/nginx/sites-available/default
-    - name: Restart nginx service
-      service: name=nginx state=restarted
+    - name: Copy fail2ban config
+      copy:
+        src: /home/awcrosby/media-search/config/jail.local
+        dest: /etc/fail2bani/
+      become: true
+    - name: Restart services
+      service: name="{{item}}" state=restarted
       become: true
       changed_when: false
+      with_items: "{{services}}"
