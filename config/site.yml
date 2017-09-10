@@ -24,10 +24,8 @@
       apt: name=mongodb-org update_cache=yes
     - name: Firewall turn on and allow OpenSSH
       ufw: rule=allow name=OpenSSH state=enabled
-    - name: Firewall allow nginx  # should be deleted after manual ssl install
-      ufw: rule=allow name="Nginx HTTP"
-    - name: Firewall allow nginx
-      ufw: rule=allow name="Nginx HTTPS"
+    - name: Firewall allow nginx https and http (for redirect to ssl)
+      ufw: rule=allow name="Nginx Full"
     - name: Copy services
       copy:
         src: /home/awcrosby/media-search/config/{{item}}
