@@ -39,10 +39,18 @@
         There are no streaming sources for this {{ mtype }}
       </div>
       <div v-else v-for="s in sources" class="source">
-        <img class="logo" :src="'/static/' + s.name + '_logo.png'" alt="logo" /> 
-        <div class="sourceinfo">
-            Stream <a :href="s.link">{{ mtype }}</a> on {{ s.display_name }}
-        </div>
+        <a :href="s.link">
+          <img class="logo" :src="'/static/' + s.name + '_logo.png'" alt="logo" />
+          <div v-if="s.name == 'amazon_pay'" class="sourceinfo">
+            Buy/Rent to stream on Amazon Video
+          </div>
+          <div v-else-if="s.name == 'amazon'" class="sourceinfo">
+            Stream on Amazon Prime
+          </div>
+          <div v-else class="sourceinfo">
+            Stream on {{ s.display_name }}
+          </div>
+        </a>
       </div>
     </div>
     {% endraw %}

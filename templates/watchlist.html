@@ -9,7 +9,7 @@
     <div id="vueapp">
       <input type="checkbox" v-model="hideNoSources" @change=toggleNoSources()> Hide media with no sources
       &nbsp; &nbsp;
-      <input type="checkbox" v-model="hideAmzPay" @change="toggleAmzPay()"> Hide Amazon Pay sources<br>
+      <input type="checkbox" v-model="hideAmzPay" @change="toggleAmzPay()"> Hide Buy/Rent Amazon sources<br>
       <div v-if="wlist.length == 0">
         <h3>Watchlist empty... search and add</h3>
       </div>
@@ -26,10 +26,8 @@
               <td>
                 <span v-for="s in w.sources" :class="{amzPay: (s.name=='amazon_pay')}">
                   <a :href="s.link">
-                    <img class="icon" :src="'static/' + s.name + '_favicon.ico'" alt="" />
-                    <span v-if="s.name=='amazon_pay'">$</span>
+                    <img class="icon" :src="'static/' + s.name + '_favicon.ico'" alt=""/>
                   </a>
-                  &nbsp;
                 </span>
               </td>
               <td><a :href="'/watchlist/delete/' + w.mtype + '/' + w.id">Delete</a></td>
