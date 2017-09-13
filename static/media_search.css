@@ -2,13 +2,12 @@
     width: 55%;
     height: 49px;
     display: block;
-    margin: 4px auto 4px auto;  /* top right bottom left */
+    margin: 6px auto 4px auto;  /* top right bottom left */
  }
 
 .icon {
-    width: 17px;
     height: 17px;
-    margin-left: 5px;
+    margin-right: 12px;
 }
 
 /* http://stackoverflow.com/questions/30930792/how-to-make-divs-that-automatically-wrap-to-the-next-row */
