@@ -306,10 +306,10 @@ def check_add_amz_source(media, category):
         director = director.replace('Dave', 'David')
         if title == 'Terminator Genisys':  # put misspelling so will match
             director = director.replace('Taylor', 'Talyor')
-        logging.info(u'searching amz for {}, director: {}'.format(
+        logging.info(u'searching amz for movie: {}, director: {}'.format(
                      title, director))
     else:
-        logging.info(u'searching amz for show {}'.format(title))
+        logging.info(u'searching amz for show: {}'.format(title))
     with open('creds.json', 'r') as f:
         k = json.loads(f.read())
     amz = BN.Amazon(k['amz_access'], k['amz_secret'],
@@ -361,19 +361,16 @@ def check_add_amz_source(media, category):
             # show: Daniel Tiger's Neighborhood has only 1 title, so false neg
             return
         amz_title = soup.find('Item').find_all('Title')[1].text
-        pos_season = amz_title.find('Season') - 1
-        amz_title = amz_title[:pos_season].rstrip('- ')
         amz_year = ''  # not used to compare, can't easily get 1st release date
+        # can get series with another api call:
+        # https://stackoverflow.com/questions/8014934/
 
-        t1 = title.translate({ord(c): None for c in "'’:"})
-        t1 = t1.lower().replace('&', 'and')
-        t2 = amz_title.translate({ord(c): None for c in "'’:"})
-        t2 = t2.lower().replace('&', 'and')
-        if t1 != t2:
+        if not doTitlesMatch(title, amz_title):
             # title mismatch on show worse than movie since no director search
             logging.warning(u'{} api issue show title mismatch, '
                             'tmdb:{}, amz:{}'.format(source_name, title, amz_title))
             return
+
     logging.info(u'amz api match: {}: amz{}, tmdb{}'.format(
         title, amz_year, year))
 
@@ -386,6 +383,18 @@ def check_add_amz_source(media, category):
               'link': soup.find('Item').find('DetailPageURL').text,
               'type': 'subscription_web_sources'}
     update_media_with_source(media, source)
+
+
+def doTitlesMatch(t1, t2):
+    def distill(t):
+        t = t.lower().replace('&', 'and')
+        t = t.split(':')[0]  # deletes text after :, good for amz seasons
+        t = t.split('volume')[0]
+        t = t.split('season')[0]
+        t = t.translate({ord(c): None for c in "'’-,"}).strip()  # remove
+        logging.info(t)
+        return t
+    return distill(t1) == distill(t2)
 
 
 '''Section for DB calls, including REST API for browser requests'''

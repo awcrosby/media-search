@@ -57,8 +57,6 @@ def search_hulu():
     driver = webdriver.PhantomJS(service_log_path='log/phantomjs.log')
     driver.implicitly_wait(10)  # seconds
     driver.set_window_size(1920, 1080)
-    #driver.get('http://gss--c.na7.visual.force.com/')
-    #import q; q.d()
     driver.get('https://www.hulu.com')
     time.sleep(1.2)
 
@@ -134,7 +132,7 @@ def search_hulu():
                     break  # exit loop, pages should never be this long
                 time.sleep(float(random.randrange(1900, 2300, 1))/1000)
             logging.info('len(medias) so far: {}'.format(len(medias)))
-        return medias  #TODO test counter and len(media) placement
+        return medias  # TODO test counter and len(media) placement
 
     # MOVIE SEARCH SECTION
     logging.info('HULU MOVIE SEARCH')
@@ -444,11 +442,7 @@ def lookup_and_write_medias(medias, mtype, source):
         # logging.info(u'tmdb found {}: {}'.format(mtype, full_media['title']))
 
         # check if titles are not exact match, in future may not append these
-        t1 = m['title'].translate({ord(c): None for c in "'’:"})
-        t1 = t1.lower().replace('&', 'and')
-        t2 = full_media['title'].translate({ord(c): None for c in "'’:"})
-        t2 = t2.lower().replace('&', 'and')
-        if t1 != t2:
+        if not flaskapp.doTitlesMatch(m['title'], full_media['title']):
             logging.warning(u'not exact titles: {} | {}'.format(
                             m['title'], full_media['title']))
 
