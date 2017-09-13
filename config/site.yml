@@ -58,7 +58,7 @@
     - name: Copy fail2ban config
       copy:
         src: /home/awcrosby/media-search/config/jail.local
-        dest: /etc/fail2bani/
+        dest: /etc/fail2ban/
       become: true
     - name: Restart services
       service: name="{{item}}" state=restarted
