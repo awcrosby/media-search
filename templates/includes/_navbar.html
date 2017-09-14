@@ -13,14 +13,23 @@
 
     <!-- Collect the nav links, forms, and other content for toggling -->
     <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
-      <a class="navbar-brand" href="/">MediaSearch</a>
+        <a class="navbar-brand" href="/">
+          <img src="/static/navbar_img.png" class="navbaricon"/>
+        </a>
       <ul class="nav navbar-nav">
+          <li {% if active_page == 'home' %} class="active"{% endif %}>
+            <a href="/">Search Media Sources</a>
+          </li>
         {% if session.logged_in %}
-          <li{% if active_page == 'watchlist' %} class="active"{% endif %}>
+          <li {% if active_page == 'watchlist' %} class="active"{% endif %}>
             <a href="/watchlist">Watchlist</a>
           </li>
-          <li{% if active_page == 'about' %} class="active"{% endif %}>
+          <li {% if active_page == 'about' %} class="active"{% endif %}>
             <a href="/about">About</a>
+          </li>
+        {% else %}
+          <li {% if active_page == 'register' %} class="active"{% endif %}>
+            <a href="/register">Register to Create Watchlist</a>
           </li>
         {% endif %}
       </ul>
@@ -29,8 +38,9 @@
         {% if session.logged_in %}
             <li><a href="/logout">Log out</a></li>
         {% else %}
-            <li><a href="/register">Register</a></li>
-            <li><a href="/login">Log in</a></li>
+            <li {% if active_page == 'login' %} class="active"{% endif %}>
+              <a href="/login">Log in</a>
+            </li>
         {% endif %}
       </ul>
     </div><!-- /.navbar-collapse -->
