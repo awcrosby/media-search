@@ -7,7 +7,7 @@
 
     <div class="col-md-5">
       <label class="radio-inline">
-        <input type="radio" name="mtype" value="movie" checked>
+        <input type="radio" name="mtype" value="movie" {% if session['dropdown'] == 'movie' %} checked {% endif %}>
         Movies
       </label>
       <label class="radio-inline">
@@ -15,7 +15,7 @@
         Shows
       </label>
       <label class="radio-inline">
-        <input type="radio" name="mtype" value="all" {% if session['dropdown'] == 'all' %} checked {% endif %}>
+        <input type="radio" name="mtype" value="all" {% if session['dropdown'] != 'show' and session['dropdown'] != 'movie' %} checked {% endif %}>
         All
       </label>
       <input type="submit" style="margin-left: 20px;" class="btn btn-primary" value="Search">
