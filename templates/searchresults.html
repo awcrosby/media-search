@@ -15,7 +15,7 @@
     <div class="row">
       {% if movies and movies['results'] %}
       {% for mv in movies['results'][:3] %}
-          <div class="col-md-2">
+          <div class="col-md-2 resultbox">
             <div>Movie:</div>
             <a href="{{ url_for('mediainfo', mtype='movie', mid=mv['id']) + '?q=' + query }}">
               <img src="{{ img_base_url + mv['poster_path'] }}">

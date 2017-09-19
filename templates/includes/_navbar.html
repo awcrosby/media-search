@@ -1,24 +1,11 @@
 <nav class="navbar navbar-default">
   <div class="container">
-    <!-- Brand and toggle get grouped for better mobile display (if want collapse)
-    <div class="navbar-header">
-      <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1" aria-expanded="false">
-        <span class="sr-only">Toggle navigation</span>
-        <span class="icon-bar"></span>
-        <span class="icon-bar"></span>
-        <span class="icon-bar"></span>
-      </button>
-      <a class="navbar-brand" href="/">MediaSearch</a>
-    </div> -->
-
-    <!-- Collect the nav links, forms, and other content for toggling -->
-    <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
-        <a class="navbar-brand" href="/">
-          <img src="/static/navbar_img.png" class="navbaricon"/>
-        </a>
+      <a class="navbar-brand" href="/">
+        <img src="/static/navbar_img.png" class="navbaricon"/>
+      </a>
       <ul class="nav navbar-nav">
           <li {% if active_page == 'home' %} class="active"{% endif %}>
-            <a href="/">Search Media Sources</a>
+            <a href="/">Search Media</a>
           </li>
         {% if session.logged_in %}
           <li {% if active_page == 'watchlist' %} class="active"{% endif %}>
@@ -29,7 +16,7 @@
           </li>
         {% else %}
           <li {% if active_page == 'register' %} class="active"{% endif %}>
-            <a href="/register">Register to Create Watchlist</a>
+            <a href="/register">Register for Watchlist</a>
           </li>
         {% endif %}
       </ul>
@@ -43,6 +30,5 @@
             </li>
         {% endif %}
       </ul>
-    </div><!-- /.navbar-collapse -->
-  </div><!-- /.container-fluid -->
+  </div>
 </nav>
