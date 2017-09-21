@@ -166,7 +166,7 @@ def display_watchlist():
             wl_detail.append(item)
 
     watchlist = json.dumps(wl_detail)
-    logging.info(u'time to get media of full watchlist: {:.2f}s'.format(time.time()-start))
+    logging.info(u'time to get media of full watchlist: {:.3f}s'.format(time.time()-start))
     return render_template('watchlist.html', medias=wl_detail, watchlist=watchlist, mtype=mtype)
 
 
@@ -451,8 +451,9 @@ def update_media_with_source(media, source):
 
 def remove_old_sources(source_name):
     ''' when media found on provider site, it's updated with timestamp,
-        any source with old timestamp is no longer avail '''
-    dt = datetime.utcnow() - timedelta(minutes=10)
+        any source with old timestamp is no longer avail...
+        set timedelta to no less than any provider takes to search '''
+    dt = datetime.utcnow() - timedelta(minutes=30)
     x = db.Media.update_many(
         {'sources': {'$elemMatch':
                         {'name': source_name,

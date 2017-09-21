@@ -24,15 +24,15 @@ def main():
                         'log/provider_search.log',
                         format='%(asctime)s %(levelname)s: %(message)s',
                         level=logging.INFO)
-    requests_cache.install_cache('demo_cache')
+    #requests_cache.install_cache('demo_cache')
 
-    search_hulu()
-    search_netflix()
+    #search_hulu()
+    #search_netflix()
     search_showtime()
-    search_hbo()
-    update_watchlist_amz()
-    flaskapp.remove_hulu_addon_media()
-    flaskapp.reindex_database()
+    #search_hbo()
+    #update_watchlist_amz()
+    #flaskapp.remove_hulu_addon_media()
+    #flaskapp.reindex_database()
 
 
 def update_watchlist_amz():
@@ -286,8 +286,7 @@ def search_showtime():
         for a in anchors:
             title = a['data-label']
             title = title[title.find(':')+1:]
-            link = base_url + a['href']
-            catalog += [{'title': title, 'link': link}]
+            catalog += [{'title': title, 'link': base_url + a['href']}]
     logging.info('will now check avail on {} catalog items'.format(
                  len(catalog)))
 
@@ -299,7 +298,7 @@ def search_showtime():
         soup = BeautifulSoup(r.text, 'html.parser')
         if soup.find(text='STREAM THIS MOVIE'):
             medias += [c[1]]
-        if c[0] and c[0] % 50 == 0:
+        if c[0] and c[0] % 100 == 0:
             logging.info(u'checked availability on {} items'.format(c[0]))
 
     lookup_and_write_medias(medias, mtype='movie', source=source)
@@ -321,79 +320,54 @@ def search_showtime():
 
     lookup_and_write_medias(medias, mtype='show', source=source)
 
+    # remove any sources not just updated, i.e. media this provider no longer has
+    flaskapp.remove_old_sources('showtime')
+
 
 def search_hbo():
     # source dict to be added to media sources[] in db for found titles
-    base_url = 'http://www.hbo.com'
+    base_url = 'https://play.hbonow.com'
     source = {'name': 'hbo',
               'display_name': 'HBO',
               'link': base_url,
               'type': 'subscription_web_sources'}
 
-    # MOVIE SEARCH SECTION
-    logging.info('HBO MOVIE SEARCH')
-    pages = ['http://www.hbo.com/movies/catalog',
-             'http://www.hbo.com/documentaries/catalog']
+    # set up phantomjs browser
+    driver = webdriver.PhantomJS(service_log_path='log/phantomjs.log')
+    driver.implicitly_wait(10)  # seconds
+    driver.set_window_size(1920, 15000)
+
+    pages = [
+              {'url': '/movies', 'mtype': 'movie'},
+              {'url': '/series', 'mtype': 'show'},
+              {'url': '/documentaries', 'mtype': 'movie'}
+            ]
+
     for page in pages:
-        r = requests.get(page)
-        soup = BeautifulSoup(r.text, 'html.parser')
+        logging.info('HBO SEARCH OF ' + page['url'])
+        driver.get(base_url + page['url'])
+        time.sleep(20)
+        soup = BeautifulSoup(driver.page_source, 'html.parser')
 
-        # get script with full dictionary of all page data
-        script = soup.find('script', {'data-id': 'reactContent'}).text
+        # remove certain divs that have links that are not media
+        for div in soup.find_all('div', 'default class1 class6'): 
+            div.decompose()
 
-        # extract json from <script> response (after equals)
-        data = json.loads(script[script.find('=')+1:])
+        # get all boxes with media image and text
+        boxes = soup.find_all('a', 'default class2 class4')
+        logging.info(u'num of media boxes found: {}'.format(len(boxes)))
 
-        # get full movie catalog
-        movies = data['content']['navigation']['films']
-        catalog = [{'title': m['title'],
-                    'link': '{}/{}'.format(base_url, m['link'])}
-                   for m in movies if m['link']]
-        logging.info('will now check avail on {} catalog items'.format(
-             len(catalog)))
-
-        # check availability via movie link, build medias list
+        # create list of titles and links, replacing newline
         medias = []
-        for c in enumerate(catalog):
-            r = requests.get(c[1]['link'])
-            soup = BeautifulSoup(r.text, 'html.parser')
-            if soup.find(text='NOW & GO'):
-                medias += [c[1]]
-            if c[0] and c[0] % 50 == 0:
-                logging.info(u'checked availability on {} items'.format(c[0]))
+        for b in boxes:
+            title = b.text.replace('\n', ' ')
+            medias += [{'title': b.text, 'link': base_url + b['href']}]
 
-        lookup_and_write_medias(medias, mtype='movie', source=source)
+        lookup_and_write_medias(medias, mtype=page['mtype'], source=source)
 
-    # SHOW SEARCH SECTION
-    logging.info('HBO SHOW SEARCH')
-    r = requests.get('http://www.hbo.com')
-    soup = BeautifulSoup(r.text, 'html.parser')
+    # remove any sources not just updated, i.e. media this provider no longer has
+    flaskapp.remove_old_sources('hbo')
 
-    # get script with full dictionary of all page data
-    script = soup.find('script', {'data-id': 'reactContent'}).text
-
-    # extract json from <script> response (after equals)
-    data = json.loads(script[script.find('=')+1:])
-
-    # get all shows, with title and link
-    shows = (data['navigation']['toplevel'][0]['subCategory'][0]['items'] +
-             data['navigation']['toplevel'][0]['subCategory'][1]['items'])
-    catalog = [{'title': m['name'], 'link': base_url + m['nav']}
-               for m in shows]
-    logging.info('will now check avail on {} catalog items'.format(
-         len(catalog)))
-
-    # check availability via link, build medias list
-    medias = []
-    for c in enumerate(catalog):
-        r = requests.get(c[1]['link'])
-        soup = BeautifulSoup(r.text, 'html.parser')
-        if soup.find(text='NOW & GO'):
-            medias += [c[1]]
-        if c[0] and c[0] % 50 == 0:
-            logging.info(u'checked availability on {} items'.format(c[0]))
-
-    lookup_and_write_medias(medias, mtype='show', source=source)
 
 
 def lookup_and_write_medias(medias, mtype, source):
@@ -410,7 +384,7 @@ def lookup_and_write_medias(medias, mtype, source):
             source_to_write['link'] = m['link']
             full_media = flaskapp.db_lookup_via_link(m['link'])
             if full_media:
-                logging.info(u'media link found in db: {}'.format(m['title']))
+                # logging.info(u'media link found in db: {}'.format(m['title']))
                 flaskapp.update_media_with_source(full_media, source_to_write)
                 continue
 
