@@ -8,7 +8,7 @@ from flask_restful import Resource, Api, reqparse
 import time
 import pymongo
 import logging
-import datetime
+from datetime import datetime, timedelta
 import requests
 import re
 from wtforms import Form, StringField, PasswordField, validators
@@ -16,6 +16,7 @@ from passlib.hash import sha256_crypt
 from functools import wraps
 import bottlenose as BN  # amazon product api wrapper
 from bs4 import BeautifulSoup
+import urllib
 app = Flask(__name__)
 api = Api(app)
 db = pymongo.MongoClient('localhost', 27017).MediaData
@@ -101,7 +102,7 @@ def register():
                 'name': name,
                 'email': email,
                 'password': password,
-                'dateCreated': datetime.datetime.utcnow(),
+                'dateCreated': datetime.utcnow(),
                 'watchlist': []})
         if ack:
             flash('You are now registered and can log in', 'success')
@@ -165,7 +166,7 @@ def display_watchlist():
             wl_detail.append(item)
 
     watchlist = json.dumps(wl_detail)
-    print('time to get media of full watchlist: {}'.format(time.time()-start))
+    logging.info(u'time to get media of full watchlist: {:.2f}s'.format(time.time()-start))
     return render_template('watchlist.html', medias=wl_detail, watchlist=watchlist, mtype=mtype)
 
 
@@ -326,21 +327,25 @@ def check_add_amz_source(media, category):
         source_name = 'amazon_pay'
         source_display = 'Amazon(Pay)'
 
-    # search amz with themoviedb info
-    if mtype == 'movie':
-        results = amz.ItemSearch(
-            SearchIndex='Movies',
-            ResponseGroup='ItemAttributes',  # type of response
-            BrowseNode=browse_node,  # product type of prime video
-            Title=title,
-            Keywords=director)
-    else:
-        results = amz.ItemSearch(
-            SearchIndex='Movies',
-            ResponseGroup='ItemAttributes,RelatedItems',  # type of response
-            BrowseNode=browse_node,  # product type of prime video
-            RelationshipType='Episode',  # necessary to get show title
-            Title=title)
+    # search iamz with themoviedb info
+    try:
+        if mtype == 'movie':
+            results = amz.ItemSearch(
+                SearchIndex='Movies',
+                ResponseGroup='ItemAttributes',  # type of response
+                BrowseNode=browse_node,  # product type of prime video
+                Title=title,
+                Keywords=director)
+        else:
+            results = amz.ItemSearch(
+                SearchIndex='Movies',
+                ResponseGroup='ItemAttributes,RelatedItems',  # type of response
+                BrowseNode=browse_node,  # product type of prime video
+                RelationshipType='Episode',  # necessary to get show title
+                Title=title)
+    except urllib.error.HTTPError:
+        logging.error('HTTP ERROR FROM AMAZON API SEARCH')
+        return
 
     # ensure results not empty
     soup = BeautifulSoup(results, "xml")
@@ -392,7 +397,6 @@ def doTitlesMatch(t1, t2):
         t = t.split('volume')[0]
         t = t.split('season')[0]
         t = t.translate({ord(c): None for c in "'’-,"}).strip()  # remove
-        logging.info(t)
         return t
     return distill(t1) == distill(t2)
 
@@ -417,20 +421,47 @@ def insert_media_if_new(media):
 
 
 def update_media_with_source(media, source):
-    db_media = db.Media.find_one({'mtype': media['mtype'],
+    # get media from database and exit if errors
+    m = db.Media.find_one({'mtype': media['mtype'],
                                   'id': media['id']})
-    if not db_media:
+    if not m:
         logging.error(u'could not find media to update source')
         return
-    if 'sources' not in db_media:
+    if 'sources' not in m:
         logging.error(u'unexpected, db media exists with no sources list')
         return
-    if not any(source['name'] in d.values() for d in db_media['sources']):
-        db.Media.find_one_and_update({'mtype': media['mtype'],
-                                      'id': media['id']},
-                                     {'$push': {'sources': source}})
-        logging.info(u'{} added for: {}'.format(source['name'],
-                                                media['title']))
+
+    if not any(source['name'] in d.values() for d in m['sources']):
+        logging.info(u'adding {} source for: {}'.format(source['name'],
+                                                       media['title']))
+
+    # delete source if it exists
+    db.Media.find_one_and_update({'mtype': m['mtype'], 'id': m['id']},
+                                 {'$pull': {'sources':
+                                             {'name': source['name']}}})
+
+    #x = db.Media.find_one({'mtype': m['mtype'], 'id': m['id']})
+    #logging.info('in update_media_with_source: {}'.format(x))
+    
+    # add source with last_updated timestamp
+    source['last_updated'] = datetime.utcnow()
+    db.Media.find_one_and_update({'mtype': m['mtype'], 'id': m['id']},
+                                 {'$push': {'sources': source}})
+
+
+def remove_old_sources(source_name):
+    ''' when media found on provider site, it's updated with timestamp,
+        any source with old timestamp is no longer avail '''
+    dt = datetime.utcnow() - timedelta(minutes=10)
+    x = db.Media.update_many(
+        {'sources': {'$elemMatch':
+                        {'name': source_name,
+                         'last_updated': {'$lt': dt} }}},
+        {'$pull': {'sources': {'name': source_name}}})
+
+    logging.info(u'removed {} source from {} media'.format(source_name,
+                                                           x.matched_count))
+    return
 
 
 def get_user_from_db(email):
