@@ -252,8 +252,8 @@ def mediainfo(mtype='', mid=None):
         return redirect(url_for('home'))
 
     # check if this title/year avail on amz, if so write to db
-    check_add_amz_source(api_media, category='prime')
-    check_add_amz_source(api_media, category='pay')
+    check_add_amz_source(api_media, source_name='amazon')
+    check_add_amz_source(api_media, source_name='amazon_pay')
 
     # get media from db to check for sources
     db_media = get_media_from_db(mtype, mid)
@@ -294,7 +294,18 @@ def themoviedb_lookup(mtype, id):
     return media
 
 
-def check_add_amz_source(media, category):
+def check_add_amz_source(media, source_name):
+    # check if amz source exists and is recent, if so then exit
+    dt = datetime.utcnow() - timedelta(days=7)
+    x = db.Media.find_one({'mtype': media['mtype'],
+                           'id': media['id'],
+                           'sources':
+                             {'$elemMatch':
+                               {'name': source_name,
+                                'last_updated': {'$gt': dt} }}})
+    if x:
+        return
+
     # prepare for amz api search
     title = media['title']
     year = media['year']
@@ -307,10 +318,7 @@ def check_add_amz_source(media, category):
         director = director.replace('Dave', 'David')
         if title == 'Terminator Genisys':  # put misspelling so will match
             director = director.replace('Taylor', 'Talyor')
-        logging.info(u'searching amz for movie: {}, director: {}'.format(
-                     title, director))
-    else:
-        logging.info(u'searching amz for show: {}'.format(title))
+    #   logging.info(u'amz mv params: {}, direct: {}'.format(title, director))
     with open('creds.json', 'r') as f:
         k = json.loads(f.read())
     amz = BN.Amazon(k['amz_access'], k['amz_secret'],
@@ -318,16 +326,12 @@ def check_add_amz_source(media, category):
     # https://github.com/lionheart/bottlenose/blob/master/README.md
 
     # set parameters to use function as prime or pay
-    if category == 'prime':
+    if source_name == 'amazon':
         browse_node = '2676882011'
-        source_name = 'amazon'
-        source_display = 'Amazon(Prime)'
-    elif category == 'pay':
+    elif source_name == 'amazon_pay':
         browse_node = '2858778011'
-        source_name = 'amazon_pay'
-        source_display = 'Amazon(Pay)'
 
-    # search iamz with themoviedb info
+    # search amz with themoviedb info
     try:
         if mtype == 'movie':
             results = amz.ItemSearch(
@@ -344,25 +348,25 @@ def check_add_amz_source(media, category):
                 RelationshipType='Episode',  # necessary to get show title
                 Title=title)
     except urllib.error.HTTPError:
-        logging.error('HTTP ERROR FROM AMAZON API SEARCH')
+        logging.error('AMZ API HTTP ERROR FROM AMAZON API SEARCH')
         return
 
     # ensure results not empty
     soup = BeautifulSoup(results, "xml")
     if int(soup.find('TotalResults').text) == 0:
-        logging.info(u'amz api no match: {}'.format(title))
+        logging.info(u'AMZ API no match: {}'.format(title))
         return
 
     # exit if missing data and log match
     if mtype == 'movie':
         if not soup.find('Item').find('ReleaseDate'):
-            logging.warning(u'{} api issue no rel yr: {}'.format(source_name, title))
+            logging.warning(u'{} AMZ API issue no rel yr: {}'.format(source_name, title))
             return  # likely means this result is obscure
         amz_title = soup.find('Item').find('Title').text  # title of 1st result
         amz_year = soup.find('Item').find('ReleaseDate').text[:4]
     else:
         if not len(soup.find('Item').find_all('Title')) > 1:
-            logging.warning(u'{} api issue no title: {}'.format(source_name, title))
+            logging.warning(u'{} AMZ API issue no title: {}'.format(source_name, title))
             # show: Daniel Tiger's Neighborhood has only 1 title, so false neg
             return
         amz_title = soup.find('Item').find_all('Title')[1].text
@@ -372,11 +376,11 @@ def check_add_amz_source(media, category):
 
         if not doTitlesMatch(title, amz_title):
             # title mismatch on show worse than movie since no director search
-            logging.warning(u'{} api issue show title mismatch, '
+            logging.warning(u'{} AMZ API issue show title mismatch, '
                             'tmdb:{}, amz:{}'.format(source_name, title, amz_title))
             return
 
-    logging.info(u'amz api match: {}: amz{}, tmdb{}'.format(
+    logging.info(u'AMZ API match: {}: amz{}, tmdb{}'.format(
         title, amz_year, year))
 
     # insert db media if not there
@@ -384,10 +388,17 @@ def check_add_amz_source(media, category):
 
     # update db media with source
     source = {'name': source_name,
-              'display_name': source_display,
-              'link': soup.find('Item').find('DetailPageURL').text,
-              'type': 'subscription_web_sources'}
+              'display_name': source_name,
+              'link': soup.find('Item').find('DetailPageURL').text}
     update_media_with_source(media, source)
+
+    # if amazon prime video found, add source for amazon_pay also...
+    # on next function call it will prevent another amz api call
+    if source_name == 'amazon':
+        source = {'name': 'amazon_pay',
+                  'display_name': 'amazon_pay',
+                  'link': soup.find('Item').find('DetailPageURL').text}
+        update_media_with_source(media, source)
 
 
 def doTitlesMatch(t1, t2):
@@ -440,9 +451,6 @@ def update_media_with_source(media, source):
                                  {'$pull': {'sources':
                                              {'name': source['name']}}})
 
-    #x = db.Media.find_one({'mtype': m['mtype'], 'id': m['id']})
-    #logging.info('in update_media_with_source: {}'.format(x))
-    
     # add source with last_updated timestamp
     source['last_updated'] = datetime.utcnow()
     db.Media.find_one_and_update({'mtype': m['mtype'], 'id': m['id']},
