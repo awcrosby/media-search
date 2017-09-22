@@ -304,6 +304,8 @@ def check_add_amz_source(media, source_name):
                                {'name': source_name,
                                 'last_updated': {'$gt': dt} }}})
     if x:
+        logging.info(u'AMZ source already in db, {}: {}'.format(source_name,
+                                                        media['title']))
         return
 
     # prepare for amz api search
@@ -347,26 +349,27 @@ def check_add_amz_source(media, source_name):
                 BrowseNode=browse_node,  # product type of prime video
                 RelationshipType='Episode',  # necessary to get show title
                 Title=title)
-    except urllib.error.HTTPError:
-        logging.error('AMZ API HTTP ERROR FROM AMAZON API SEARCH')
+    except urllib.error.HTTPError as e:
+        logging.error(u'AMZ API HTTP ERROR, {}: {}'.format(source_name, title))
+        logging.exception(e)
         return
 
     # ensure results not empty
     soup = BeautifulSoup(results, "xml")
     if int(soup.find('TotalResults').text) == 0:
-        logging.info(u'AMZ API no match: {}'.format(title))
+        logging.info(u'AMZ API no match, {}: {}'.format(source_name, title))
         return
 
     # exit if missing data and log match
     if mtype == 'movie':
         if not soup.find('Item').find('ReleaseDate'):
-            logging.warning(u'{} AMZ API issue no rel yr: {}'.format(source_name, title))
+            logging.warning(u'AMZ API no rel yr, {}: {}'.format(source_name, title))
             return  # likely means this result is obscure
         amz_title = soup.find('Item').find('Title').text  # title of 1st result
         amz_year = soup.find('Item').find('ReleaseDate').text[:4]
     else:
         if not len(soup.find('Item').find_all('Title')) > 1:
-            logging.warning(u'{} AMZ API issue no title: {}'.format(source_name, title))
+            logging.warning(u'AMZ API no title, {}: {}'.format(source_name, title))
             # show: Daniel Tiger's Neighborhood has only 1 title, so false neg
             return
         amz_title = soup.find('Item').find_all('Title')[1].text
@@ -376,12 +379,12 @@ def check_add_amz_source(media, source_name):
 
         if not doTitlesMatch(title, amz_title):
             # title mismatch on show worse than movie since no director search
-            logging.warning(u'{} AMZ API issue show title mismatch, '
+            logging.warning(u'AMZ API show title mismatch, {}: '
                             'tmdb:{}, amz:{}'.format(source_name, title, amz_title))
             return
 
-    logging.info(u'AMZ API match: {}: amz{}, tmdb{}'.format(
-        title, amz_year, year))
+    logging.info(u'AMZ API match, {}: {}: amz{}, tmdb{}'.format(
+        source_name, title, amz_year, year))
 
     # insert db media if not there
     insert_media_if_new(media)
@@ -461,7 +464,7 @@ def remove_old_sources(source_name):
     ''' when media found on provider site, it's updated with timestamp,
         any source with old timestamp is no longer avail...
         set timedelta to no less than any provider takes to search '''
-    dt = datetime.utcnow() - timedelta(minutes=30)
+    dt = datetime.utcnow() - timedelta(minutes=120)
     x = db.Media.update_many(
         {'sources': {'$elemMatch':
                         {'name': source_name,

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import requests
-import requests_cache
+# import requests_cache
 from bs4 import BeautifulSoup
 import json
 import time
@@ -24,13 +24,13 @@ def main():
                         'log/provider_search.log',
                         format='%(asctime)s %(levelname)s: %(message)s',
                         level=logging.INFO)
-    #requests_cache.install_cache('demo_cache')
+    # requests_cache.install_cache('demo_cache')
 
     #search_hulu()
     #search_netflix()
-    search_showtime()
+    #search_showtime()
     #search_hbo()
-    #update_watchlist_amz()
+    update_watchlist_amz()
     #flaskapp.remove_hulu_addon_media()
     #flaskapp.reindex_database()
 
@@ -40,8 +40,9 @@ def update_watchlist_amz():
     wl_unique = flaskapp.get_all_watchlist_in_db()
     for m in wl_unique:
         media = flaskapp.themoviedb_lookup(m['mtype'], m['id'])
-        flaskapp.check_add_amz_source(media, category='prime')
-        flaskapp.check_add_amz_source(media, category='pay')
+        flaskapp.check_add_amz_source(media, source_name='amazon')
+        time.sleep(1.1)
+        flaskapp.check_add_amz_source(media, source_name='amazon_pay')
         time.sleep(1.1)
     return
 
@@ -80,7 +81,7 @@ def search_hulu():
     time.sleep(1.2)
 
     # switch out of iframe and click profile link
-    driver.find_element_by_id('98994228').click()
+    driver.find_element_by_id('62038018').click()
     time.sleep(1.2)
     logging.info('hulu, clicked profile')
     driver.save_screenshot('static/screenshot2.png')
@@ -157,6 +158,9 @@ def search_hulu():
     lookup_and_write_medias(medias, mtype='show', source=source)
 
     driver.quit()
+
+    # remove any sources not just updated: media this provider no longer has
+    flaskapp.remove_old_sources('hulu')
 
 
 def search_netflix():
@@ -243,6 +247,9 @@ def search_netflix():
 
     driver.quit()
 
+    # remove any sources not just updated: media this provider no longer has
+    flaskapp.remove_old_sources('netflix')
+
 
 def search_showtime():
     # source dict to be added to media sources[] in db for found titles
@@ -320,13 +327,13 @@ def search_showtime():
 
     lookup_and_write_medias(medias, mtype='show', source=source)
 
-    # remove any sources not just updated, i.e. media this provider no longer has
+    # remove any sources not just updated: media this provider no longer has
     flaskapp.remove_old_sources('showtime')
 
 
 def search_hbo():
     # source dict to be added to media sources[] in db for found titles
-    base_url = 'https://play.hbonow.com'
+    base_url = 'https://play.hbogo.com'
     source = {'name': 'hbo',
               'display_name': 'HBO',
               'link': base_url,
@@ -350,7 +357,7 @@ def search_hbo():
         soup = BeautifulSoup(driver.page_source, 'html.parser')
 
         # remove certain divs that have links that are not media
-        for div in soup.find_all('div', 'default class1 class6'): 
+        for div in soup.find_all('div', 'default class1 class6'):
             div.decompose()
 
         # get all boxes with media image and text
@@ -361,13 +368,14 @@ def search_hbo():
         medias = []
         for b in boxes:
             title = b.text.replace('\n', ' ')
-            medias += [{'title': b.text, 'link': base_url + b['href']}]
+            medias += [{'title': title, 'link': base_url + b['href']}]
 
         lookup_and_write_medias(medias, mtype=page['mtype'], source=source)
 
-    # remove any sources not just updated, i.e. media this provider no longer has
-    flaskapp.remove_old_sources('hbo')
+    driver.quit()
 
+    # remove any sources not just updated: media this provider no longer has
+    flaskapp.remove_old_sources('hbo')
 
 
 def lookup_and_write_medias(medias, mtype, source):
@@ -384,7 +392,7 @@ def lookup_and_write_medias(medias, mtype, source):
             source_to_write['link'] = m['link']
             full_media = flaskapp.db_lookup_via_link(m['link'])
             if full_media:
-                # logging.info(u'media link found in db: {}'.format(m['title']))
+                # logging.info(u'db media link found: {}'.format(m['title']))
                 flaskapp.update_media_with_source(full_media, source_to_write)
                 continue
 
