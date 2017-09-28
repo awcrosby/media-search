@@ -335,6 +335,7 @@ def check_add_amz_source(media, source_name):
 
     # search amz with themoviedb info
     try:
+        logging.info('MAKE AMZ REQUEST')
         if mtype == 'movie':
             results = amz.ItemSearch(
                 SearchIndex='Movies',
@@ -368,11 +369,12 @@ def check_add_amz_source(media, source_name):
         amz_title = soup.find('Item').find('Title').text  # title of 1st result
         amz_year = soup.find('Item').find('ReleaseDate').text[:4]
     else:
-        if not len(soup.find('Item').find_all('Title')) > 1:
+        if ((not soup.find('Item')) or
+            (not soup.find('Item').find('Title'))):
             logging.warning(u'AMZ API no title, {}: {}'.format(source_name, title))
-            # show: Daniel Tiger's Neighborhood has only 1 title, so false neg
             return
-        amz_title = soup.find('Item').find_all('Title')[1].text
+        amz_title = soup.find('Item').find_all('Title')[-1].text
+
         amz_year = ''  # not used to compare, can't easily get 1st release date
         # can get series with another api call:
         # https://stackoverflow.com/questions/8014934/
@@ -407,10 +409,9 @@ def check_add_amz_source(media, source_name):
 def doTitlesMatch(t1, t2):
     def distill(t):
         t = t.lower().replace('&', 'and')
-        t = t.split(':')[0]  # deletes text after :, good for amz seasons
-        t = t.split('volume')[0]
+        t = t.split('volume')[0]  # deletes text after, good for amz seasons
         t = t.split('season')[0]
-        t = t.translate({ord(c): None for c in "'’-,"}).strip()  # remove
+        t = t.translate({ord(c): None for c in ":'’-,"}).strip()  # remove
         return t
     return distill(t1) == distill(t2)
 
