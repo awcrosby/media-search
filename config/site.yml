@@ -1,8 +1,4 @@
 - hosts: myhost  # playbook to setup system as root
-  vars:
-    services:
-      - mongodb.service
-      - media-search.service
   become: true
   tasks:
     - name: Updates package lists for upgrades/new pkg, then upgrades all current packages to the latest version
@@ -26,42 +22,48 @@
       ufw: rule=allow name=OpenSSH state=enabled
     - name: Firewall allow nginx https and http (for redirect to ssl)
       ufw: rule=allow name="Nginx Full"
-    - name: Copy services
-      copy:
-        src: /home/awcrosby/media-search/config/{{item}}
-        dest: /etc/systemd/system/{{item}}
-      with_items: "{{services}}"
-    - name: Start and enable on startup the services
-      service: name="{{item}}" state=started enabled=yes
-      with_items: "{{services}}"
 - hosts: myhost  # playbook to setup code environment
   vars:
     githubuser: awcrosby@gmail.com
     services:
       - nginx
       - fail2ban
+    newServices:
+      - mongodb.service
+      - media-search.service
   tasks:
     - name: Make project directory
-      file: path=/home/awcrosby/media-search/ state=directory
+      file: path=~/media-search/ state=directory
     - name: Git clone media-search repo
       git:
         repo: https://{{ githubuser | urlencode }}:{{ githubpw }}@github.com/awcrosby/media-search.git
-        dest: /home/awcrosby/media-search
+        dest: ~/media-search
     - name: Create virtual environment and install pip packages
       pip:
-        requirements: /home/awcrosby/media-search/requirements.txt
-        virtualenv: /home/awcrosby/media-search/venv
+        requirements: ~/media-search/requirements.txt
+        virtualenv: ~/media-search/venv
     - name: Copy nginx config to replace the default
+      become: true
       copy:
-        src: /home/awcrosby/media-search/config/nginx_config_pre_ssl
+        src: ~/media-search/config/nginx_config_pre_ssl
         dest: /etc/nginx/sites-available/default
     - name: Copy fail2ban config
+      become: true
       copy:
-        src: /home/awcrosby/media-search/config/jail.local
+        src: ~/media-search/config/jail.local
         dest: /etc/fail2ban/
-      become: true
     - name: Restart services
-      service: name="{{item}}" state=restarted
       become: true
+      service: name="{{item}}" state=restarted
       changed_when: false
       with_items: "{{services}}"
+    - name: Copy services
+      become: true
+      copy:
+        src: ~/media-search/config/{{item}}
+        dest: /etc/systemd/system/{{item}}
+      with_items: "{{newServices}}"
+    - name: Start and enable on startup the services
+      become: true
+      service: name="{{item}}" state=started enabled=yes
+      with_items: "{{newServices}}"
