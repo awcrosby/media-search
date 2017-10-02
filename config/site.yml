@@ -38,6 +38,11 @@
       git:
         repo: https://{{ githubuser | urlencode }}:{{ githubpw }}@github.com/awcrosby/media-search.git
         dest: ~/media-search
+    - name: Create symlink for vim settings
+      file:
+        src: ~/media-search/config/.vimrc
+        dest: ~/.vimrc
+        state: link
     - name: Create virtual environment and install pip packages
       pip:
         requirements: ~/media-search/requirements.txt
