@@ -5,9 +5,9 @@ After=network.target
 [Service]
 User=ubuntu
 Group=www-data
-WorkingDirectory=~/media-search
-Environment="PATH=~/media-search/venv/bin"
-ExecStart=~/media-search/venv/bin/gunicorn --reload --workers 4 --bind unix:media-search.sock -m 007 --access-logfile ~/media-search/log/gunicorn-access.log  --error-logfile ~/media-search/log/flaskapp.log wsgi:app
+WorkingDirectory=/home/ubuntu/media-search
+Environment="PATH=/home/ubuntu/media-search/venv/bin"
+ExecStart=/home/ubuntu/media-search/venv/bin/gunicorn --reload --workers 4 --bind unix:media-search.sock -m 007 --access-logfile /home/ubuntu/media-search/log/gunicorn-access.log  --error-logfile /home/ubuntu/media-search/log/flaskapp.log wsgi:app
 
 [Install]
 WantedBy=multi-user.target
