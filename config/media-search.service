@@ -3,11 +3,11 @@ Description=Gunicorn instance to serve media-search
 After=network.target
 
 [Service]
-User=awcrosby
+User=ubuntu
 Group=www-data
-WorkingDirectory=/home/awcrosby/media-search
-Environment="PATH=/home/awcrosby/media-search/venv/bin"
-ExecStart=/home/awcrosby/media-search/venv/bin/gunicorn --reload --workers 4 --bind unix:media-search.sock -m 007 --access-logfile /home/awcrosby/media-search/log/gunicorn-access.log  --error-logfile /home/awcrosby/media-search/log/flaskapp.log wsgi:app
+WorkingDirectory=~/media-search
+Environment="PATH=~/media-search/venv/bin"
+ExecStart=~/media-search/venv/bin/gunicorn --reload --workers 4 --bind unix:media-search.sock -m 007 --access-logfile ~/media-search/log/gunicorn-access.log  --error-logfile ~/media-search/log/flaskapp.log wsgi:app
 
 [Install]
 WantedBy=multi-user.target

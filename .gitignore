@@ -16,3 +16,4 @@ creds.json
 screenshot*.png
 /venv
 /config/site.retry
+site.yml.bkup
