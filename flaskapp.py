@@ -27,8 +27,7 @@ db = pymongo.MongoClient('localhost', 27017).MediaData
     display streaming sources by type, with links and show ep info
     support user login to create and edit a watchlist'''
 
-logging.basicConfig(filename='/home/awcrosby/media-search/'
-                    'log/flaskapp.log',
+logging.basicConfig(filename='log/flaskapp.log',
                     format='%(asctime)s %(levelname)s: %(message)s',
                     level=logging.INFO)
 app.secret_key = '3d6gtrje6d2rffe2jqkv'
