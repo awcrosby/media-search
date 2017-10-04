@@ -13,9 +13,9 @@
             <div><strong>{{ media['title'] }} ({{ media['year'] }})</strong></div>
             {% if mtype == 'show' %}
                 <div><em>{{ media['number_of_seasons'] }} seasons, {{ media['number_of_episodes'] }} episodes</em></div>
-                <div><a href={{ 'https://www.themoviedb.org/tv/{}'.format(media['id']) }}>TheMovieDB</a></div>
+                <div><a href={{ 'https://www.themoviedb.org/tv/{}'.format(media['id']) }} target="_blank">TheMovieDB</a></div>
             {% else %}
-                <div><a href={{ 'https://www.themoviedb.org/movie/{}'.format(media['id']) }}>TheMovieDB</a></div>
+                <div><a href={{ 'https://www.themoviedb.org/movie/{}'.format(media['id']) }} target="_blank">TheMovieDB</a></div>
             {% endif %}
             <div>{{ media['overview'] }}</div>
             {% if session.logged_in %}
@@ -38,20 +38,42 @@
       <div v-if="sources.length == 0" style="color: red">
         There are no streaming sources for this {{ mtype }}
       </div>
-      <div v-else v-for="s in sources" class="source">
-        <a :href="s.link">
-          <img class="logo" :src="'/static/' + s.name + '_logo.png'" alt="logo" />
-          <div v-if="s.name == 'amazon_pay'" class="sourceinfo">
-            Buy/Rent to stream on Amazon Video
+      <template v-else v-for="s in sources">
+        <div v-if="s.name != 'amazon_pay'" class="source">
+          <a :href="s.link">
+            <img class="logo" :src="'/static/' + s.name + '_logo.png'" alt="logo" />
+            <div v-if="s.name == 'amazon_pay'" class="sourceinfo">
+              Buy/Rent to stream on Amazon Video
+              <div v-for="t in s.temptext">{{ t }}</div>
+            </div>
+            <div v-else-if="s.name == 'amazon'" class="sourceinfo">
+              Stream on Amazon Prime
+            </div>
+            <div v-else class="sourceinfo">
+              Stream on {{ s.display_name }}
+            </div>
+          </a>
+        </div>
+        <div v-else class="source amz_pay_source">
+          <div>
+            <img class="amz_pay_logo" :src="'/static/' + s.name + '_logo.png'" alt="logo" />
+            <div>Pay to stream or buy DVD/Blu-ray</div>
           </div>
-          <div v-else-if="s.name == 'amazon'" class="sourceinfo">
-            Stream on Amazon Prime
+          <div class="sourceinfo">
+            <div v-for="p in s.products">
+              <a :href="p.link">
+                <template v-if="p.type == 'disc'">
+                  💿 {{ p.title }} - {{ p.price }}
+                </template>
+                <template v-else>
+                  <span class="glyphicon glyphicon-download-alt" style="padding: 0px 2px"></span>
+                  {{ p.title }} - {{ p.price }}
+                </template>
+              </a>
+            </div>
           </div>
-          <div v-else class="sourceinfo">
-            Stream on {{ s.display_name }}
-          </div>
-        </a>
-      </div>
+        </div>
+      </template>
     </div>
     {% endraw %}
 

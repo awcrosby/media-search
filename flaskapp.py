@@ -295,7 +295,7 @@ def themoviedb_lookup(mtype, id):
 
 def check_add_amz_source(media, source_name):
     # check if amz source exists and is recent, if so then exit
-    dt = datetime.utcnow() - timedelta(days=7)
+    dt = datetime.utcnow() - timedelta(days=0)  #TODO TEMP changed from 7 to 0
     x = db.Media.find_one({'mtype': media['mtype'],
                            'id': media['id'],
                            'sources':
@@ -330,7 +330,8 @@ def check_add_amz_source(media, source_name):
     if source_name == 'amazon':
         browse_node = '2676882011'
     elif source_name == 'amazon_pay':
-        browse_node = '2858778011'
+        browse_node = '2625373011'  # Movies & TV, the highest ancestor
+        # TEMP? changed from 2858778011, Amz Video
 
     # search amz with themoviedb info
     try:
@@ -338,14 +339,14 @@ def check_add_amz_source(media, source_name):
         if mtype == 'movie':
             results = amz.ItemSearch(
                 SearchIndex='Movies',
-                ResponseGroup='ItemAttributes',  # type of response
+                ResponseGroup='ItemAttributes,OfferSummary',  # type of response
                 BrowseNode=browse_node,  # product type of prime video
                 Title=title,
                 Keywords=director)
         else:
             results = amz.ItemSearch(
                 SearchIndex='Movies',
-                ResponseGroup='ItemAttributes,RelatedItems',  # type of response
+                ResponseGroup='ItemAttributes,RelatedItems,OfferSummary',
                 BrowseNode=browse_node,  # product type of prime video
                 RelationshipType='Episode',  # necessary to get show title
                 Title=title)
@@ -394,24 +395,123 @@ def check_add_amz_source(media, source_name):
     source = {'name': source_name,
               'display_name': source_name,
               'link': soup.find('Item').find('DetailPageURL').text}
-    update_media_with_source(media, source)
 
-    # if amazon prime video found, add source for amazon_pay also...
-    # on next function call it will prevent another amz api call
-    if source_name == 'amazon':
-        source = {'name': 'amazon_pay',
-                  'display_name': 'amazon_pay',
-                  'link': soup.find('Item').find('DetailPageURL').text}
-        update_media_with_source(media, source)
+    if source_name == 'amazon_pay':
+        products = []
+        for item in soup.find_all('Item'):
+            attr = item.find('ItemAttributes')
+            ptype = attr.find('ProductTypeName').text
+
+            # skip product if ProductType is not expected
+            if (not (ptype == 'DOWNLOADABLE_TV_SEASON' and mtype == 'show') and
+                not (ptype == 'DOWNLOADABLE_MOVIE' and mtype == 'movie') and
+                not  ptype == 'ABIS_DVD'):
+                continue
+
+            logging.info(u'productTypeName: {}'.format(ptype))
+
+            # skip product if no price or title mis-match
+            if not attr.find('ListPrice'):
+                #logging.info('product has no price')
+                continue
+            if ((mtype == 'show' or mtype == 'movie') and
+                not doTitlesMatch(title, attr.find('Title').text)):
+                #logging.info(u'title mismatch: {} | {}'.format(title,
+                #             attr.find('Title').text))
+                continue
+
+            # skip if movie amz title has year and very diff than themoviedb
+            try:
+                amz_title = attr.find('Title').text
+                if (mtype == 'movie' and
+                    re.search('\([0-9][0-9][0-9][0-9]\)$', amz_title)):
+                    amz_year = int(amz_title[-5:-1])  # assume year at end
+                    tmdb_year = int(year)
+                    if abs(amz_year - tmdb_year) > 1:
+                        logging.info('year in title, diff > 1')
+                        continue
+            except Exception as e:
+                logging.exception('error finding or converting year to int')
+                continue
+
+            # create product object
+            logging.info('adding product')
+            prod = {}
+
+            if ptype == 'DOWNLOADABLE_TV_SEASON':  # no offer on relateditems
+                prod['price'] = attr.find('ListPrice').find(
+                                'FormattedPrice').text
+            else: 
+                prod['price'] = item.find('OfferSummary').find(
+                                'LowestNewPrice').find('FormattedPrice').text
+            prod['price'] = prod['price'].replace('Too low to display', '')
+
+            prod['title'] = attr.find('Title').text
+            prod['link'] = item.find('DetailPageURL').text
+            if ptype == 'ABIS_DVD':
+                prod['type'] = 'disc'
+            else:
+                prod['type'] = 'stream'
+
+            # shorten DVD title
+            if ptype == 'ABIS_DVD' and mtype == 'show':
+                prod['title'] = prod['title'].replace('The Complete', '')
+                prod['title'] = prod['title'].replace(' ,', '')
+
+            # add product to product list
+            products.append(prod)
+            continue
+
+            # try to get a better price description, but often captcha
+            if ptype == 'DOWNLOADABLE_MOVIE':
+                r = requests.get(prod['link'].split('?')[0])
+                html = BeautifulSoup(r.text, 'html.parser')
+                if not html.find_all('input', {'data-quality': 'SD'}):
+                    logging.warning('recaptcha')
+                for i in html.find_all('input', {'data-quality': 'SD'}):
+                    if i.get('value').startswith('Rent Movie SD $'):
+                        prod['price'] = i.get('value')
+                        break
+                    elif i.get('value').startswith('Buy Movie SD $'):
+                        prod['price'] = i.get('value')
+            elif ptype == 'DOWNLOADABLE_TV_SEASON':
+                r = requests.get(prod['link'].split('?')[0])
+                html = BeautifulSoup(r.text, 'html.parser')
+                if not html.find_all('input', {'data-quality': 'SD'}):
+                    logging.warning('recaptcha')
+                for i in html.find_all('input', {'data-quality': 'SD'}):
+                    logging.info('i= {}'.format(i))
+                    if i.get('value').startswith('Buy Season'):
+                        prod['price'] = i.get('value')
+                        prod['title'] = prod['title'].split('Season')[0]
+                        prod['title'] = prod['title'].strip(' ,')
+
+            # add product to product list
+            products.append(prod)
+
+        products = sorted(products, key=lambda k: k['title'])
+        products = sorted(products, key=lambda k: k['type'], reverse=True)
+        source['products'] = products
+
+    update_media_with_source(media, source)
 
 
 def doTitlesMatch(t1, t2):
     def distill(t):
-        t = t.lower().replace('&', 'and')
-        t = t.split('volume')[0]  # deletes text after, good for amz seasons
-        t = t.split('season')[0]
-        t = t.translate({ord(c): None for c in ":'’-,"}).strip()  # remove
+        # special section for bad matches
+        if 'Cast & Creators' in t: return None  # prevent fam guy fal pos
+        t = t.replace('Terminator 4: Salvation', 'Terminator Salvation')
+        t = t.replace('Terminator: Genisys', 'Terminator Genisys')
+
+        t = t.lower().replace('&', 'and').replace('the ', '')
+        t = t.replace('original classic ', '')
+        for x in ['season', 'ssn', 'series', 'volume', 'blu-ray', '(', ':']:
+            t = t.split(x)[0]  # take left of word, for amz seasons
+        t = t.translate({ord(c): None for c in ":'’-,[]()"}).strip()  # remove
+        t = t.replace(' ii', ' 2').replace(' iii', ' 3').replace(' iv', ' 4')
         return t
+        # note: when ignore right of ':' bad for 'Tron' != 'Tron: Legacy'
+        #       but good for 'Blade Runner: The Final Cut'
     return distill(t1) == distill(t2)
 
 
