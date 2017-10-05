@@ -488,10 +488,10 @@ def amz_pay_check(media):
             prod['title'] = prod['title'].replace('The Complete', '')
             prod['title'] = prod['title'].replace(' ,', '')
 
-        # limited(since captcha) look for better price description
-        if len(products) < 1:
-            if ptype == 'DOWNLOADABLE_MOVIE':
-                logging.info('getting better price description')
+        # http req for better price, only do once for stream since captcha
+        if not any('stream' in d.values() for d in products):
+            if prod['type'] == 'stream':
+                logging.info('http req for better price')
                 r = requests.get(prod['link'].split('?')[0])
                 html = BeautifulSoup(r.text, 'html.parser')
                 if not html.find_all('input', {'data-quality': 'SD'}):
@@ -502,14 +502,7 @@ def amz_pay_check(media):
                         break
                     elif i.get('value').startswith('Buy Movie SD $'):
                         prod['price'] = i.get('value')
-            elif ptype == 'DOWNLOADABLE_TV_SEASON':
-                logging.info('getting better price description')
-                r = requests.get(prod['link'].split('?')[0])
-                html = BeautifulSoup(r.text, 'html.parser')
-                if not html.find_all('input', {'data-quality': 'SD'}):
-                    logging.warning('recaptcha')
-                for i in html.find_all('input', {'data-quality': 'SD'}):
-                    if i.get('value').startswith('Buy Season'):
+                    elif i.get('value').startswith('Buy Season'):
                         prod['price'] = i.get('value')
                         prod['title'] = prod['title'].split('Season')[0]
                         prod['title'] = prod['title'].strip(' ,')
@@ -530,7 +523,7 @@ def amz_pay_check(media):
     source = {'name': source_name,
               'display_name': source_name,
               'products': products,
-              'link': soup.find('Item').find('DetailPageURL').text}
+              'link': url_for('mediainfo', mtype=mtype, mid=media['id'])}
     logging.info(u'AMZ API match, {}: {}'.format(source_name, title))
     update_media_with_source(media, source)
 
@@ -541,16 +534,21 @@ def doTitlesMatch(t1, t2):
         if 'Cast & Creators' in t: return None  # prevent fam guy fal pos
         t = t.replace('Terminator 4: Salvation', 'Terminator Salvation')
         t = t.replace('Terminator: Genisys', 'Terminator Genisys')
+        t = t.replace('Godfather:', 'Godfather')
 
+        t = t.replace(' III', ' 3').replace(' II', ' 2').replace(' IV', ' 4')
         t = t.lower().replace('&', 'and').replace('the ', '')
         t = t.replace('original classic ', '')
         for x in ['season', 'ssn', 'series', 'volume', 'blu-ray', '(', ':']:
             t = t.split(x)[0]  # take left of word, for amz seasons
-        t = t.translate({ord(c): None for c in ":'’-,[]()"}).strip()  # remove
-        t = t.replace(' ii', ' 2').replace(' iii', ' 3').replace(' iv', ' 4')
+        t = t.translate({ord(c): None for c in "'’-,[]()"}).strip()  # remove
+        logging.info(t)
         return t
         # note: when ignore right of ':' bad for 'Tron' != 'Tron: Legacy'
         #       but good for 'Blade Runner: The Final Cut'
+    # if any('collection' in t for t in [distill(t1), distill(t2)]):
+    #     return True  # dvd collection likely includes the movie, but messier
+    # else:
     return distill(t1) == distill(t2)
 
 
