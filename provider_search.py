@@ -40,9 +40,11 @@ def update_watchlist_amz():
     wl_unique = flaskapp.get_all_watchlist_in_db()
     for m in wl_unique:
         media = flaskapp.themoviedb_lookup(m['mtype'], m['id'])
-        flaskapp.check_add_amz_source(media, source_name='amazon')
+        #flaskapp.check_add_amz_source(media, source_name='amazon')
+        flaskapp.amz_prime_check(media)
         time.sleep(1.1)
-        flaskapp.check_add_amz_source(media, source_name='amazon_pay')
+        #flaskapp.check_add_amz_source(media, source_name='amazon_pay')
+        flaskapp.amz_pay_check(media)
         time.sleep(1.1)
     return
 
@@ -75,7 +77,7 @@ def search_hulu():
     email_input.send_keys(creds['hulu_u'])
     pw_input.send_keys(creds['hulu_p'])
     logging.info('hulu, pasted u/p')
-    driver.save_screenshot('static/screenshot.png')
+    # driver.save_screenshot('static/screenshot.png')
     # driver.find_element_by_id('recaptcha_response_field').send_keys('')
     form.find_element_by_tag_name('button').click()
     time.sleep(1.2)

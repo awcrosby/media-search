@@ -20,8 +20,16 @@
           </tr>
           <template v-for="w in wlist">
             <tr :class="sourceClasses(w)">
-              <td v-if="w.mtype == 'show'"><img class="icon" src="static/glyphicon-tv.png" alt="tv icon" /></td>
-              <td v-else><img class="icon" src="static/glyphicon-film.png" alt="film icon" /></td>
+                <td v-if="w.mtype == 'show'">
+                  <a :href="w.mtype + '/id/' + w.id">
+                    <img class="icon" src="static/glyphicon-tv.png" alt="tv icon" />
+                  </a>
+                </td>
+                <td v-else>
+                  <a :href="w.mtype + '/id/' + w.id">
+                    <img class="icon" src="static/glyphicon-film.png" alt="film icon" />
+                  </a>
+                </td>
               <td>{{ w.title }}</td>
               <td>
                 <span v-for="s in w.sources" :class="{amzPay: (s.name=='amazon_pay')}">
