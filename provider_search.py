@@ -26,13 +26,13 @@ def main():
                         level=logging.INFO)
     # requests_cache.install_cache('demo_cache')
 
-    #search_hulu()
-    #search_netflix()
-    #search_showtime()
-    #search_hbo()
+    search_hulu()
+    search_netflix()
+    search_showtime()
+    search_hbo()
     update_watchlist_amz()
-    #flaskapp.remove_hulu_addon_media()
-    #flaskapp.reindex_database()
+    flaskapp.remove_hulu_addon_media()
+    flaskapp.reindex_database()
 
 
 def update_watchlist_amz():
@@ -41,9 +41,9 @@ def update_watchlist_amz():
     for m in wl_unique:
         media = flaskapp.themoviedb_lookup(m['mtype'], m['id'])
         flaskapp.check_add_amz_source(media, source_name='amazon')
-        time.sleep(1.1)
+        time.sleep(1.5)
         flaskapp.check_add_amz_source(media, source_name='amazon_pay')
-        time.sleep(1.1)
+        time.sleep(1.5)
     return
 
 

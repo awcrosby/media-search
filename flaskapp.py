@@ -159,6 +159,9 @@ def display_watchlist():
         if full_media:
             m = {k:v for (k,v) in full_media.items() if k in
                  ['title', 'sources', 'mtype', 'year', 'id']}
+            s = m['sources']
+            s = sorted(s, key=lambda k: k['name'] == 'amazon_pay')
+            m['sources'] = s
             wl_detail.append(m)
         else:  # if db lookup did not return data for the item
             item['sources'] = []
