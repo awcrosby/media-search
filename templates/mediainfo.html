@@ -40,7 +40,7 @@
       </div>
       <template v-else v-for="s in sources">
         <div v-if="s.name != 'amazon_pay'" class="source">
-          <a :href="s.link">
+          <a :href="s.link" target="_blank">
             <img class="logo" :src="'/static/' + s.name + '_logo.png'" alt="logo" />
             <div v-if="s.name == 'amazon_pay'" class="sourceinfo">
               Buy/Rent to stream on Amazon Video
@@ -57,17 +57,17 @@
         <div v-else class="source amz_pay_source">
           <div>
             <img class="amz_pay_logo" :src="'/static/' + s.name + '_logo.png'" alt="logo" />
-            <div>Pay to stream or buy DVD/Blu-ray</div>
+            <div>Pay to stream or buy DVD / Blu-ray</div>
           </div>
           <div class="sourceinfo">
             <div v-for="p in s.products">
-              <a :href="p.link">
+              <a :href="p.link" target="_blank">
                 <template v-if="p.type == 'disc'">
                   💿 {{ p.title }} - {{ p.price }}
                 </template>
                 <template v-else>
-                  <span class="glyphicon glyphicon-download-alt" style="padding: 0px 2px"></span>
-                  {{ p.title }} - {{ p.price }}
+                  <!-- <span class="glyphicon glyphicon-download-alt" style="padding: 0px 2px"></span> -->
+                  ▶️ {{ p.title }} - {{ p.price }}
                 </template>
               </a>
             </div>

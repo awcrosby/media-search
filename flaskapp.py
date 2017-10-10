@@ -360,7 +360,7 @@ def amz_prime_check(media):
     mtype = media['mtype']
 
     # check if amz source exists and is recent, if so then exit
-    dt = datetime.utcnow() - timedelta(days=0)  #TODO TEMP changed from 7 to 0
+    dt = datetime.utcnow() - timedelta(days=7)
     x = db.Media.find_one({'mtype': mtype, 'id': media['id'], 'sources':
         {'$elemMatch': {'name': source_name, 'last_updated': {'$gt': dt} }}})
     if x:
@@ -414,7 +414,7 @@ def amz_pay_check(media):
     mtype = media['mtype']
 
     # check if amz source exists and is recent, if so then exit
-    dt = datetime.utcnow() - timedelta(days=0)  #TODO TEMP changed from 7 to 0
+    dt = datetime.utcnow() - timedelta(days=7)
     x = db.Media.find_one({'mtype': mtype, 'id': media['id'], 'sources':
         {'$elemMatch': {'name': source_name, 'last_updated': {'$gt': dt} }}})
     if x:
@@ -526,7 +526,7 @@ def amz_pay_check(media):
     source = {'name': source_name,
               'display_name': source_name,
               'products': products,
-              'link': url_for('mediainfo', mtype=mtype, mid=media['id'])}
+              'link': '/' + mtype + '/id/' + str(media['id'])}
     logging.info(u'AMZ API match, {}: {}'.format(source_name, title))
     update_media_with_source(media, source)
 
@@ -545,7 +545,7 @@ def doTitlesMatch(t1, t2):
         for x in ['season', 'ssn', 'series', 'volume', 'blu-ray', '(', ':']:
             t = t.split(x)[0]  # take left of word, for amz seasons
         t = t.translate({ord(c): None for c in "'’-,[]()"}).strip()  # remove
-        logging.info(t)
+        # logging.info(t)
         return t
         # note: when ignore right of ':' bad for 'Tron' != 'Tron: Legacy'
         #       but good for 'Blade Runner: The Final Cut'

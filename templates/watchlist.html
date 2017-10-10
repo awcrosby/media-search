@@ -9,12 +9,12 @@
     <div id="vueapp">
       <input type="checkbox" v-model="hideNoSources" @change=toggleNoSources()> Hide media with no sources
       &nbsp; &nbsp;
-      <input type="checkbox" v-model="hideAmzPay" @change="toggleAmzPay()"> Hide Buy/Rent Amazon sources<br>
+      <input type="checkbox" v-model="hideAmzPay" @change="toggleAmzPay()"> Hide Amazon pay sources<br>
       <div v-if="wlist.length == 0">
         <h3>Watchlist empty... search and add</h3>
       </div>
       <div v-else class="panel panel-default">
-        <table class="table table-condensed table-striped">
+        <table class="table table-condensed table">
           <tr>
             <th class="col-md-1"></th>  <th class="col-md-4">Title</th>  <th class="col-md-4">Sources</th>  <th class="col-md-3"></th>
           </tr>
@@ -30,10 +30,10 @@
                     <img class="icon" src="static/glyphicon-film.png" alt="film icon" />
                   </a>
                 </td>
-              <td>{{ w.title }}</td>
+              <td>{{ w.title }} ({{ w.year }})</td>
               <td>
                 <span v-for="s in w.sources" :class="{amzPay: (s.name=='amazon_pay')}">
-                  <a :href="s.link">
+                  <a :href="s.link" target="_blank">
                     <img class="icon" :src="'static/' + s.name + '_favicon.ico'" alt=""/>
                   </a>
                 </span>
