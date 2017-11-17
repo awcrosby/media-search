@@ -1,2 +1,13 @@
-[sshd]
-enabled = true
+[DEFAULT]
+bantime  = 604800 
+# 604800sec = 1week:
+findtime = 604800
+
+destemail  = andrew@awctech.com
+sendername = fail2ban@mediasearch
+
+
+[ssh]
+enabled  = true
+maxretry = 3
+action   = %(action_mwl)s
