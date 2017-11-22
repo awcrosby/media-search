@@ -7,9 +7,9 @@
 
   {% raw %}
     <div id="vueapp">
-      <input type="checkbox" v-model="hideNoSources" @change=toggleNoSources()> Hide media with no sources
+      <input type="checkbox" v-model="hideNoSources" @change="toggleNoSources"> Hide media with no sources
       &nbsp; &nbsp;
-      <input type="checkbox" v-model="hideAmzPay" @change="toggleAmzPay()"> Hide Amazon pay sources<br>
+      <input type="checkbox" v-model="hideAmzPay" @change="toggleAmzPay"> Hide Amazon pay sources<br>
       <div v-if="wlist.length == 0">
         <h3>Watchlist empty... search and add</h3>
       </div>
@@ -20,17 +20,19 @@
           </tr>
           <template v-for="w in wlist">
             <tr :class="sourceClasses(w)">
-                <td v-if="w.mtype == 'show'">
-                  <a :href="w.mtype + '/id/' + w.id">
-                    <img class="icon" src="static/glyphicon-tv.png" alt="tv icon" />
-                  </a>
-                </td>
-                <td v-else>
-                  <a :href="w.mtype + '/id/' + w.id">
-                    <img class="icon" src="static/glyphicon-film.png" alt="film icon" />
-                  </a>
-                </td>
+              <td v-if="w.mtype == 'show'">
+                <a :href="w.mtype + '/id/' + w.id">
+                  <img class="icon" src="static/glyphicon-tv.png" alt="tv icon" />
+                </a>
+              </td>
+              <td v-else>
+                <a :href="w.mtype + '/id/' + w.id">
+                  <img class="icon" src="static/glyphicon-film.png" alt="film icon" />
+                </a>
+              </td>
+
               <td>{{ w.title }} ({{ w.year }})</td>
+
               <td>
                 <span v-for="s in w.sources" :class="{amzPay: (s.name=='amazon_pay')}">
                   <a :href="s.link" target="_blank">
@@ -38,7 +40,9 @@
                   </a>
                 </span>
               </td>
-              <td><a :href="'/watchlist/delete/' + w.mtype + '/' + w.id">Delete</a></td>
+
+              <td><button class="btn btn-xs" @click="delItem(w)">Delete</button></td>
+
             </tr>
           </template>
         </table>
@@ -82,6 +86,21 @@
                         $('.amzPay').css('display', '');
                     };
                     this.toggleNoSources();
+                },
+                delItem: function(w) {
+                    this.$http.delete('/api/item/' + w.mtype + '/' + w.id)
+                        .then(function(response) {
+                            $('.alert').alert('close');  // close any open alerts
+                            let index = this.wlist.indexOf(w);
+                            if (index > -1) {
+                                this.wlist.splice(index, 1);
+                            }
+                        }, function(error) {
+                            $('.alert').alert('close');  // close any open alerts
+                            $('#customAlert').html(
+                                '<div class="alert alert-danger">Could not delete item</div>'
+                            );
+                        });
                 }
             }
         });

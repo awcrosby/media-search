@@ -80,7 +80,7 @@ class MediaSearchApiTestCase(unittest.TestCase):
         self.assertTrue(10428 in [i['id'] for i in json_data])
 
         # delete and check deleted
-        rv = self.app.get('/watchlist/delete/movie/10428')
+        rv = self.app.delete('/api/item/movie/10428')
         rv = self.app.get('/api/watchlist')
         json_data = json.loads(bytes.decode(rv.data))
         self.assertFalse(10428 in [i['id'] for i in json_data])

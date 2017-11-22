@@ -4,7 +4,6 @@
 
 from flask import (Flask, render_template, request, redirect,
                    url_for, flash, session, json, abort)
-from flask_restful import Resource, Api, reqparse
 import time
 import pymongo
 import logging
@@ -17,9 +16,16 @@ from functools import wraps
 import bottlenose as BN  # amazon product api wrapper
 from bs4 import BeautifulSoup
 import urllib
+#from media_api import WatchlistAPI, ItemAPI  # api for this flask app
+from flask_restful import Api, reqparse, Resource
 app = Flask(__name__)
-api = Api(app)
 db = pymongo.MongoClient('localhost', 27017).MediaData
+
+# set up api and resource routing
+api = Api(app)
+#api.add_resource(WatchlistAPI, '/api/watchlist')
+#api.add_resource(ItemAPI, '/api/item/<mtype>/<int:mid>')
+parser = reqparse.RequestParser()
 
 '''webframework flaskapp high-level functionality:
     user search query via themoviedb api, results with links to specific media
@@ -31,7 +37,6 @@ logging.basicConfig(filename='log/flaskapp.log',
                     format='%(asctime)s %(levelname)s: %(message)s',
                     level=logging.INFO)
 app.secret_key = '3d6gtrje6d2rffe2jqkv'
-parser = reqparse.RequestParser()
 
 
 # initialize database by creating collection and unique index
@@ -645,38 +650,17 @@ def remove_hulu_addon_media():
     return
 
 
-# route to allow browser click to initiate delete watchlist item
-@app.route('/watchlist/delete/<mtype>/<int:mid>', methods=['GET'])
-@is_logged_in
-def delFromWatchlist(mtype=None, mid=None):
-    resp = db.Users.find_one_and_update(
-        {'email': session['email']},
-        {'$pull': {'watchlist': {'mtype': mtype, 'id': mid}}})
-    if resp:
-        flash('Item deleted from watchlist', 'success')
-    else:
-        flash('Item not deleted from watchlist', 'danger')
-    return redirect(url_for('display_watchlist'))
-
-
-# REST-like API, HTTP DELETE to delete item, for js in future
-class WlistDelAPI(Resource):
-    def delete(self, mtype, mid, email):
-        flash('DELETE API function called', 'success')
-        return redirect(url_for('display_watchlist'))
-
-
-# REST-like API, post via browser, get only by unittest now, js in future
+# REST-like API
 class WatchlistAPI(Resource):
     decorators = [is_logged_in]
 
-    def get(self):
+    def get(self):  # executed only by unit test
         user = db.Users.find_one({'email': session['email']})
         if not user:
             return '', 404
         return user['watchlist'], 200
 
-    def post(self):
+    def post(self):  # executed via full browser request, not js
         # check if media already in watchlist and if so exit
         user = db.Users.find_one({'email': session['email']})
         wl_ids = [w['id'] for w in user['watchlist']
@@ -698,9 +682,20 @@ class WatchlistAPI(Resource):
         return redirect(url_for('display_watchlist'))
 
 
+class ItemAPI(Resource):
+    def delete(self, mtype, mid):  # executed via javascript
+        resp = db.Users.find_one_and_update(
+            {'email': session['email']},
+            {'$pull': {'watchlist': {'mtype': mtype, 'id': mid}}})
+        if resp:
+            return '', 204
+        else:
+            return 'Item was not deleted', 500
+
+
 # set up api resource routing
-api.add_resource(WlistDelAPI, '/api/watchlist_del')
 api.add_resource(WatchlistAPI, '/api/watchlist')
+api.add_resource(ItemAPI, '/api/item/<mtype>/<int:mid>')
 
 
 if __name__ == "__main__":
