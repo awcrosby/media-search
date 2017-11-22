@@ -25,7 +25,6 @@ db = pymongo.MongoClient('localhost', 27017).MediaData
 api = Api(app)
 #api.add_resource(WatchlistAPI, '/api/watchlist')
 #api.add_resource(ItemAPI, '/api/item/<mtype>/<int:mid>')
-parser = reqparse.RequestParser()
 
 '''webframework flaskapp high-level functionality:
     user search query via themoviedb api, results with links to specific media
@@ -174,7 +173,7 @@ def display_watchlist():
 
     watchlist = json.dumps(wl_detail)
     logging.info(u'time to get media of full watchlist: {:.3f}s'.format(time.time()-start))
-    return render_template('watchlist.html', medias=wl_detail, watchlist=watchlist, mtype=mtype)
+    return render_template('watchlist.html', medias=wl_detail, watchlist=watchlist, mtype=mtype, user=user)
 
 
 # send user query to themoviedb api and return results or single mediainfo.html
@@ -682,6 +681,16 @@ class WatchlistAPI(Resource):
         return redirect(url_for('display_watchlist'))
 
 
+class UserAPI(Resource):
+    def post(self):
+        args = request.get_json()
+        db.Users.find_one_and_update(
+            {'email': session['email']},
+            {'$set': {'prefs': {'hideAmzPayIcons': args['hideAmzPayIcons'],
+                                'hideBlankLines': args['hideBlankLines']}}})
+        return '', 204
+
+
 class ItemAPI(Resource):
     def delete(self, mtype, mid):  # executed via javascript
         resp = db.Users.find_one_and_update(
@@ -695,6 +704,7 @@ class ItemAPI(Resource):
 
 # set up api resource routing
 api.add_resource(WatchlistAPI, '/api/watchlist')
+api.add_resource(UserAPI, '/api/user')
 api.add_resource(ItemAPI, '/api/item/<mtype>/<int:mid>')
 
 

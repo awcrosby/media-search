@@ -3,13 +3,14 @@
 
 {% block body %}
   {% include 'includes/_searchbar.html' %}
-  <div class="clearfix" style="margin-top: 20px;"></div>
 
   {% raw %}
     <div id="vueapp">
-      <input type="checkbox" v-model="hideNoSources" @change="toggleNoSources"> Hide media with no sources
-      &nbsp; &nbsp;
-      <input type="checkbox" v-model="hideAmzPay" @change="toggleAmzPay"> Hide Amazon pay sources<br>
+      <div style="margin: 15px 0px 3px 3px;">
+        <input type="checkbox" v-model="hideBlankLines" @change="hideShowListItems"> Hide media with no sources
+        &nbsp; &nbsp;
+        <input type="checkbox" v-model="hideAmzPayIcons" @change="hideShowListItems"> Hide Amazon pay sources
+      </div>
       <div v-if="wlist.length == 0">
         <h3>Watchlist empty... search and add</h3>
       </div>
@@ -51,13 +52,17 @@
   {% endraw %}
 
     <script>
-        var watchlist = {{ watchlist|safe }};
         new Vue({
             el: "#vueapp",
             data: {
-                wlist: watchlist,
-                hideNoSources: false,
-                hideAmzPay: false
+                wlist: {{ watchlist|safe }},
+                {% if user['prefs']['hideBlankLines'] is defined %}
+                    hideBlankLines: {{ user['prefs']['hideBlankLines'] | tojson }},
+                    hideAmzPayIcons: {{ user['prefs']['hideAmzPayIcons'] | tojson }}
+                {% else %}  // ensure py var exists before attempt to convert to json
+                    hideBlankLines: true,
+                    hideAmzPayIcons: true
+                {% endif %}
             },
             methods: {
                 sourceClasses: function(w) {
@@ -66,10 +71,21 @@
                         noSubSource: ((w.sources.length == 1) && (w.sources[0].name == 'amazon_pay'))
                     }
                 },
-                toggleNoSources: function() {
-                    if (this.hideNoSources) {
+                hideShowListItems: function() {
+                    // send post to api to update user prefs
+                    this.$http.post('/api/user', {'hideBlankLines': this.hideBlankLines, 'hideAmzPayIcons': this.hideAmzPayIcons});
+
+                    // hide or show amzPay icons
+                    if (this.hideAmzPayIcons) {
+                        $('.amzPay').css('display', 'none');
+                    } else {
+                        $('.amzPay').css('display', '');
+                    };
+
+                    // hide or show blank lines with no sources
+                    if (this.hideBlankLines) {
                         $('.noSource').css('display', 'none');
-                        if (this.hideAmzPay) {
+                        if (this.hideAmzPayIcons) {
                             $('.noSubSource').css('display', 'none');
                         } else {
                             $('.noSubSource').css('display', '');
@@ -78,14 +94,6 @@
                         $('.noSource').css('display', '');
                         $('.noSubSource').css('display', '');
                     };
-                },
-                toggleAmzPay: function() {
-                    if (this.hideAmzPay) {
-                        $('.amzPay').css('display', 'none');
-                    } else {
-                        $('.amzPay').css('display', '');
-                    };
-                    this.toggleNoSources();
                 },
                 delItem: function(w) {
                     this.$http.delete('/api/item/' + w.mtype + '/' + w.id)
@@ -102,6 +110,9 @@
                             );
                         });
                 }
+            },
+            mounted: function() {  // lifecycle hook for vue instance
+                this.hideShowListItems();
             }
         });
     </script>
