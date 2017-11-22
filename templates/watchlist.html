@@ -56,7 +56,7 @@
             el: "#vueapp",
             data: {
                 wlist: {{ watchlist|safe }},
-                {% if user['prefs']['hideBlankLines'] is defined %}
+                {% if (user['prefs'] is defined) and (user['prefs']['hideBlankLines'] is defined) %}
                     hideBlankLines: {{ user['prefs']['hideBlankLines'] | tojson }},
                     hideAmzPayIcons: {{ user['prefs']['hideAmzPayIcons'] | tojson }}
                 {% else %}  // ensure py var exists before attempt to convert to json
