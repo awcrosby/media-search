@@ -7,9 +7,9 @@
   {% raw %}
     <div id="vueapp">
       <div style="margin: 15px 0px 3px 3px;">
-        <input type="checkbox" v-model="hideBlankLines" @change="hideShowListItems"> Hide media with no sources
+        <label><input type="checkbox" v-model="hideBlankLines" @change="hideShowListItems"> Hide media with no sources</label>
         &nbsp; &nbsp;
-        <input type="checkbox" v-model="hideAmzPayIcons" @change="hideShowListItems"> Hide Amazon pay sources
+        <label><input type="checkbox" v-model="hideAmzPayIcons" @change="hideShowListItems"> Hide Amazon pay sources</label>
       </div>
       <div v-if="wlist.length == 0">
         <h3>Watchlist empty... search and add</h3>
@@ -60,8 +60,8 @@
                     hideBlankLines: {{ user['prefs']['hideBlankLines'] | tojson }},
                     hideAmzPayIcons: {{ user['prefs']['hideAmzPayIcons'] | tojson }}
                 {% else %}  // ensure py var exists before attempt to convert to json
-                    hideBlankLines: true,
-                    hideAmzPayIcons: true
+                    hideBlankLines: false,
+                    hideAmzPayIcons: false
                 {% endif %}
             },
             methods: {
