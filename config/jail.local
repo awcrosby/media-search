@@ -7,7 +7,7 @@ destemail  = andrew@awctech.com
 sendername = fail2ban@mediasearch
 
 
-[ssh]
+[sshd]
 enabled  = true
 maxretry = 3
 action   = %(action_mwl)s
