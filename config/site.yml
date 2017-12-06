@@ -93,7 +93,7 @@
         name: database backups
         minute: 26
         hour: 5
-        job: mongodump -d MediaData -o ~/db_backups/"MediaData_bkup_$(date +"%Y%m%d-%H%M")"
+        job: ~/media-search/config/mongo_bkup.sh
     #- name: Add crontab entry to run provider_search.py
     #  cron:
     #    name: provider search
