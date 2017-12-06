@@ -17,3 +17,4 @@ screenshot*.png
 /venv
 /config/site.retry
 site.yml.bkup
+/db_backups
