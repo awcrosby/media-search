@@ -6,3 +6,5 @@ set softtabstop=0   " if non-zero, a mix of spaces and tabs can be used
 set expandtab       " tabs are spaces, also softtabstop will be ignored and spaces will be forced
 set shiftwidth=4    " size of an indent
 set smarttab        " tab key goes to next indent
+set bg=dark
+set visualbell
