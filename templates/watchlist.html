@@ -7,9 +7,9 @@
   {% raw %}
     <div id="vueapp">
       <div style="margin: 15px 0px 3px 3px;">
-        <label><input type="checkbox" v-model="hideBlankLines" @change="hideShowListItems"> Hide media with no sources</label>
+        <label><input type="checkbox" v-model="showMap.blank_lines" @change="changedPrefs"> Hide media with no sources</label>
         &nbsp; &nbsp;
-        <label><input type="checkbox" v-model="hideAmzPayIcons" @change="hideShowListItems"> Hide Amazon pay sources</label>
+        <label><input type="checkbox" v-model="showMap.amazon_pay" @change="changedPrefs"> Hide Amazon pay sources</label>
       </div>
       <div v-if="wlist.length == 0">
         <h3>Watchlist empty... search and add</h3>
@@ -19,30 +19,30 @@
           <tr>
             <th class="col-md-1"></th>  <th class="col-md-4">Title</th>  <th class="col-md-4">Sources</th>  <th class="col-md-3"></th>
           </tr>
-          <template v-for="w in wlist">
-            <tr :class="sourceClasses(w)">
-              <td v-if="w.mtype == 'show'">
-                <a :href="w.mtype + '/id/' + w.id">
+          <template v-for="item in wlist">
+            <tr :class="sourceClasses(item)">
+              <td v-if="item.mtype == 'show'">
+                <a :href="item.mtype + '/id/' + item.id">
                   <img class="icon" src="static/glyphicon-tv.png" alt="tv icon" />
                 </a>
               </td>
               <td v-else>
-                <a :href="w.mtype + '/id/' + w.id">
+                <a :href="item.mtype + '/id/' + item.id">
                   <img class="icon" src="static/glyphicon-film.png" alt="film icon" />
                 </a>
               </td>
 
-              <td>{{ w.title }} ({{ w.year }})</td>
+              <td>{{ item.title }} ({{ item.year }})</td>
 
-              <td>
-                <span v-for="s in w.sources" :class="{amzPay: (s.name=='amazon_pay')}">
+              <td id="item.id">
+                <span v-for="s in item.sources" v-show="!showMap[s.name]">
                   <a :href="s.link" target="_blank">
                     <img class="icon" :src="'static/' + s.name + '_favicon.ico'" alt=""/>
                   </a>
                 </span>
               </td>
 
-              <td><button class="btn btn-xs" @click="delItem(w)">Delete</button></td>
+              <td><button class="btn btn-xs" @click="delItem(item)">Delete</button></td>
 
             </tr>
           </template>
@@ -56,13 +56,21 @@
             el: "#vueapp",
             data: {
                 wlist: {{ watchlist|safe }},
-                {% if (user['prefs'] is defined) and (user['prefs']['hideBlankLines'] is defined) %}
-                    hideBlankLines: {{ user['prefs']['hideBlankLines'] | tojson }},
-                    hideAmzPayIcons: {{ user['prefs']['hideAmzPayIcons'] | tojson }}
-                {% else %}  // ensure py var exists before attempt to convert to json
-                    hideBlankLines: false,
-                    hideAmzPayIcons: false
-                {% endif %}
+                tempVar: true,
+                showMap: {  // says whether each source / blanklines should be hidden
+                    'netflix': false,
+                    'hbo': false,
+                    'hulu': false,
+                    'showtime': false,
+                    'amazon': false,
+                    {% if (user['prefs'] is defined) and (user['prefs']['hideBlankLines'] is defined) %}
+                        'amazon_pay': {{ user['prefs']['hideAmzPayIcons'] | tojson }},
+                        'blank_lines': {{ user['prefs']['hideBlankLines'] | tojson }},
+                    {% else %}  // ensure py var exists before attempt to convert to json
+                        'amazon_pay': false,
+                        'blank_lines': false,
+                    {% endif %}
+                },
             },
             methods: {
                 sourceClasses: function(w) {
@@ -71,21 +79,14 @@
                         noSubSource: ((w.sources.length == 1) && (w.sources[0].name == 'amazon_pay'))
                     }
                 },
-                hideShowListItems: function() {
+                changedPrefs: function() {
                     // send post to api to update user prefs
-                    this.$http.post('/api/user', {'hideBlankLines': this.hideBlankLines, 'hideAmzPayIcons': this.hideAmzPayIcons});
-
-                    // hide or show amzPay icons
-                    if (this.hideAmzPayIcons) {
-                        $('.amzPay').css('display', 'none');
-                    } else {
-                        $('.amzPay').css('display', '');
-                    };
+                    this.$http.post('/api/user', {'hideBlankLines': this.showMap.blank_lines, 'hideAmzPayIcons': this.showMap.amazon_pay});
 
                     // hide or show blank lines with no sources
-                    if (this.hideBlankLines) {
+                    if (this.showMap.blank_lines) {
                         $('.noSource').css('display', 'none');
-                        if (this.hideAmzPayIcons) {
+                        if (this.showMap.amazon_pay) {
                             $('.noSubSource').css('display', 'none');
                         } else {
                             $('.noSubSource').css('display', '');
@@ -95,24 +96,29 @@
                         $('.noSubSource').css('display', '');
                     };
                 },
-                delItem: function(w) {
-                    this.$http.delete('/api/item/' + w.mtype + '/' + w.id)
-                        .then(function(response) {
-                            $('.alert').alert('close');  // close any open alerts
-                            let index = this.wlist.indexOf(w);
-                            if (index > -1) {
-                                this.wlist.splice(index, 1);
-                            }
-                        }, function(error) {
-                            $('.alert').alert('close');  // close any open alerts
-                            $('#customAlert').html(
-                                '<div class="alert alert-danger">Could not delete item</div>'
-                            );
-                        });
+                delItem: function(item) {
+                    //this.$http.delete('/api/item/' + item.mtype + '/' + item.id)
+                    //    .then(function(response) {
+                    //        $('.alert').alert('close');  // close any open alerts
+                    //        let index = this.wlist.indexOf(item);
+                    //        if (index > -1) {
+                    //            this.wlist.splice(index, 1);
+                    //        }
+                    //    }, function(error) {
+                    //        $('.alert').alert('close');  // close any open alerts
+                    //        $('#customAlert').html(
+                    //            '<div class="alert alert-danger">Could not delete item</div>'
+                    //        );
+                    //    });
+
+                    let index = this.wlist.indexOf(item);
+                    if (index > -1) {
+                        this.wlist.splice(index, 1);
+                    }
                 }
             },
             mounted: function() {  // lifecycle hook for vue instance
-                this.hideShowListItems();
+                //this.hideShowListItems();
             }
         });
     </script>
