@@ -115,10 +115,11 @@
                     if (index > -1) {
                         this.wlist.splice(index, 1);
                     }
+                    this.changedPrefs();
                 }
             },
             mounted: function() {  // lifecycle hook for vue instance
-                //this.hideShowListItems();
+                this.changedPrefs();
             }
         });
     </script>
