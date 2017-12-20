@@ -19,8 +19,7 @@
           <tr>
             <th class="col-md-1"></th>  <th class="col-md-4">Title</th>  <th class="col-md-4">Sources</th>  <th class="col-md-3"></th>
           </tr>
-          <template v-for="item in wlist">
-            <tr :class="sourceClasses(item)">
+          <tr v-for="item in wlist" v-show="isDisplay(item)">
               <td v-if="item.mtype == 'show'">
                 <a :href="item.mtype + '/id/' + item.id">
                   <img class="icon" src="static/glyphicon-tv.png" alt="tv icon" />
@@ -34,7 +33,7 @@
 
               <td>{{ item.title }} ({{ item.year }})</td>
 
-              <td id="item.id">
+              <td>
                 <span v-for="s in item.sources" v-show="!showMap[s.name]">
                   <a :href="s.link" target="_blank">
                     <img class="icon" :src="'static/' + s.name + '_favicon.ico'" alt=""/>
@@ -43,9 +42,7 @@
               </td>
 
               <td><button class="btn btn-xs" @click="delItem(item)">Delete</button></td>
-
-            </tr>
-          </template>
+          </tr>
         </table>
       </div>
     </div>
@@ -73,28 +70,18 @@
                 },
             },
             methods: {
-                sourceClasses: function(w) {
-                    return {
-                        noSource: (w.sources.length == 0),
-                        noSubSource: ((w.sources.length == 1) && (w.sources[0].name == 'amazon_pay'))
+                isDisplay: function(item) {
+                    if (this.showMap.blank_lines && item.sources.length == 0) {
+                        return false;
+                    } else if (this.showMap.blank_lines && this.showMap.amazon_pay && item.sources.length == 1 && item.sources[0].name == 'amazon_pay') {
+                        return false;
+                    } else {
+                        return true;
                     }
                 },
                 changedPrefs: function() {
                     // send post to api to update user prefs
                     this.$http.post('/api/user', {'hideBlankLines': this.showMap.blank_lines, 'hideAmzPayIcons': this.showMap.amazon_pay});
-
-                    // hide or show blank lines with no sources
-                    if (this.showMap.blank_lines) {
-                        $('.noSource').css('display', 'none');
-                        if (this.showMap.amazon_pay) {
-                            $('.noSubSource').css('display', 'none');
-                        } else {
-                            $('.noSubSource').css('display', '');
-                        };
-                    } else {
-                        $('.noSource').css('display', '');
-                        $('.noSubSource').css('display', '');
-                    };
                 },
                 delItem: function(item) {
                     //this.$http.delete('/api/item/' + item.mtype + '/' + item.id)
@@ -117,9 +104,6 @@
                     }
                     this.changedPrefs();
                 }
-            },
-            mounted: function() {  // lifecycle hook for vue instance
-                this.changedPrefs();
             }
         });
     </script>
