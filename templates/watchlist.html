@@ -84,25 +84,19 @@
                     this.$http.post('/api/user', {'hideBlankLines': this.showMap.blank_lines, 'hideAmzPayIcons': this.showMap.amazon_pay});
                 },
                 delItem: function(item) {
-                    //this.$http.delete('/api/item/' + item.mtype + '/' + item.id)
-                    //    .then(function(response) {
-                    //        $('.alert').alert('close');  // close any open alerts
-                    //        let index = this.wlist.indexOf(item);
-                    //        if (index > -1) {
-                    //            this.wlist.splice(index, 1);
-                    //        }
-                    //    }, function(error) {
-                    //        $('.alert').alert('close');  // close any open alerts
-                    //        $('#customAlert').html(
-                    //            '<div class="alert alert-danger">Could not delete item</div>'
-                    //        );
-                    //    });
-
-                    let index = this.wlist.indexOf(item);
-                    if (index > -1) {
-                        this.wlist.splice(index, 1);
-                    }
-                    this.changedPrefs();
+                    this.$http.delete('/api/item/' + item.mtype + '/' + item.id)
+                        .then(function(response) {
+                            $('.alert').alert('close');  // close any open alerts
+                            let index = this.wlist.indexOf(item);
+                            if (index > -1) {
+                                this.wlist.splice(index, 1);
+                            }
+                        }, function(error) {
+                            $('.alert').alert('close');  // close any open alerts
+                            $('#customAlert').html(
+                                '<div class="alert alert-danger">Could not delete item</div>'
+                            );
+                        });
                 }
             }
         });
