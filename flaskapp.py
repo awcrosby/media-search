@@ -80,7 +80,8 @@ class RegisterForm(Form):
 # landing page
 @app.route('/')
 def home():
-    return render_template('home.html')
+    recs = get_media_recs()
+    return render_template('home.html', recs=recs)
 
 
 # about page
@@ -560,6 +561,13 @@ def doTitlesMatch(t1, t2):
 
 
 '''Section for DB calls, including REST API for browser requests'''
+
+
+def get_media_recs():
+    return db.Media.aggregate([
+                {'$match': {'sources.2': {'$exists': True}}},
+                {'$sample': {'size': 6}}
+           ])   
 
 
 def get_media_from_db(mtype, mid):

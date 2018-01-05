@@ -5,5 +5,26 @@
 
     {% include 'includes/_header.html' %}
     {% include 'includes/_searchbar.html' %}
-    
+
+    {% set img_base_url = 'https://image.tmdb.org/t/p/w154' %}
+
+    <br><br><br>
+    <div class="recommendations">
+        <h4>Recommendations:</h4>
+        {% for rec in recs %}
+            <div class="col-md-2 resultbox">
+                <!-- <div>{{ rec['mtype']|capitalize() }}:</div> -->
+                <a href="{{ url_for('mediainfo', mtype=rec['mtype'], mid=rec['id']) }}">
+                    <img src="{{ img_base_url + rec['poster_path'] }}">
+                    <div>
+                        {% for s in rec['sources'] %}<span><img class="icon" src="static/{{ s['name'] }}_favicon.ico" alt=""/></span>{% endfor %}
+                    </div>
+                    <div>{{ rec['title'] }} ({{ rec['year'] }})</div>
+                </a>
+            </div>
+        {% endfor %}
+        <div style="clear: both"></div>
+    </div>
+
 {% endblock %}
+

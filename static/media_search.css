@@ -106,3 +106,9 @@ h4 {
 .navbaricon {
     height: 32px;
 }
+
+.recommendations {
+    background: #eeeeee;
+    border-radius: 25px;
+    padding: 20px;
+}
