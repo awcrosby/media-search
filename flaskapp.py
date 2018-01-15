@@ -564,8 +564,12 @@ def doTitlesMatch(t1, t2):
 
 
 def get_media_recs():
+    # get media with at least 2 sources not being amazon_pay
     return db.Media.aggregate([
-                {'$match': {'sources.2': {'$exists': True}}},
+                {'$match': {'$and': [ {'sources.1': {'$exists': True}},
+                                      {'sources.0.name': {'$ne': 'amazon_pay'}},
+                                      {'sources.1.name': {'$ne': 'amazon_pay'}}
+                                    ]}},
                 {'$sample': {'size': 6}}
            ])   
 

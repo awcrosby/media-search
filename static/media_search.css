@@ -107,8 +107,6 @@ h4 {
     height: 32px;
 }
 
-.recommendations {
-    background: #eeeeee;
-    border-radius: 25px;
-    padding: 20px;
-}
+#recs-outer { background: #eeeeee; border-radius: 25px; padding: 20px; }
+#recs-inner { display: flex; flex-wrap: wrap; }
+#recs-inner article { width: 154px; margin: 0 14px; }

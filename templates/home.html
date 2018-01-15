@@ -9,22 +9,23 @@
     {% set img_base_url = 'https://image.tmdb.org/t/p/w154' %}
 
     <br><br><br>
-    <div class="recommendations">
+    <section id="recs-outer">
         <h4>Recommendations:</h4>
-        {% for rec in recs %}
-            <div class="col-md-2 resultbox">
+        <div id="recs-inner">
+          {% for rec in recs %}
+            <article>
                 <!-- <div>{{ rec['mtype']|capitalize() }}:</div> -->
                 <a href="{{ url_for('mediainfo', mtype=rec['mtype'], mid=rec['id']) }}">
                     <img src="{{ img_base_url + rec['poster_path'] }}">
                     <div>
                         {% for s in rec['sources'] %}<span><img class="icon" src="static/{{ s['name'] }}_favicon.ico" alt=""/></span>{% endfor %}
                     </div>
-                    <div>{{ rec['title'] }} ({{ rec['year'] }})</div>
+                    <p>{{ rec['title'] }} ({{ rec['year'] }})</p>
                 </a>
-            </div>
-        {% endfor %}
-        <div style="clear: both"></div>
-    </div>
+            </article>
+          {% endfor %}
+        </div>
+    </section>
 
 {% endblock %}
 
