@@ -9,12 +9,11 @@
     {% set img_base_url = 'https://image.tmdb.org/t/p/w154' %}
 
     <br><br><br>
-    <section id="recs-outer">
+    <section id="recommendations">
         <h4>Recommendations:</h4>
-        <div id="recs-inner">
+        <div id="results">
           {% for rec in recs %}
             <article>
-                <!-- <div>{{ rec['mtype']|capitalize() }}:</div> -->
                 <a href="{{ url_for('mediainfo', mtype=rec['mtype'], mid=rec['id']) }}">
                     <img src="{{ img_base_url + rec['poster_path'] }}">
                     <div>

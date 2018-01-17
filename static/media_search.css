@@ -9,17 +9,13 @@
     margin-bottom: 20px;
 }
 
-.resultbox {
-    margin-bottom: 15px;
-}
-
 /* http://stackoverflow.com/questions/30930792/how-to-make-divs-that-automatically-wrap-to-the-next-row */
 .source {
     display: inline-block;
     position: relative;
     width: 252px;
     height: 168px;
-    margin: 0px 6px 10px 0px;  /* top right bottom left */
+    margin: 0px 6px 10px 0px;
     border: solid 1px black;
     padding: 0px;
     text-align: center;
@@ -39,33 +35,19 @@
     width: 55%;
     height: 49px;
     display: block;
-    margin: 6px auto 4px auto;  /* top right bottom left */
+    margin: 6px auto 4px auto;
 }
 
 .amz_pay_logo {
     width: 100px; 
     height: 49px;
     float: left;
-    margin: 0px 12px 4px 5px;  /* top right bottom left */
+    margin: 0px 12px 4px 5px;
 }
 
 .name {
     font-weight: bold;
     font-size: 125%;
-}
-
-.typetvp {
-    /* background-color: indigo;
-    background-color: brown; */ 
-    background-color: rebeccapurple;
-    /* background-color: slateblue; */
-    color: white;
-}
-
-.typefree {
-    /* background-color: darkslategray; */
-    background-color: sienna;
-    color: white;
 }
 
 .sourceinfo {
@@ -107,6 +89,8 @@ h4 {
     height: 32px;
 }
 
-#recs-outer { background: #eeeeee; border-radius: 25px; padding: 20px; }
-#recs-inner { display: flex; flex-wrap: wrap; }
-#recs-inner article { width: 154px; margin: 0 14px; }
+#recommendations { background: #eeeeee; border-radius: 25px; padding: 20px 0 10px 28px; }
+#recommendations h4 { margin: 0 0 2px 0; }
+#results { display: flex; flex-wrap: wrap; }
+#results article { width: 154px; margin: 0 31px 0 0; padding-top: 6px; }
+#results h5 { margin-bottom: 5px; }

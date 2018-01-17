@@ -12,30 +12,16 @@
         <h3>Search results for: <strong>{{ query }}</strong></h3>
     {% endif %}
 
-    <div class="row">
-      {% if movies and movies['results'] %}
-      {% for mv in movies['results'][:3] %}
-          <div class="col-md-2 resultbox">
-            <div>Movie:</div>
-            <a href="{{ url_for('mediainfo', mtype='movie', mid=mv['id']) + '?q=' + query }}">
-              <img src="{{ img_base_url + mv['poster_path'] }}">
-              <div>{{ mv['title'] }} ({{ mv['release_date'][:4] }})</div>
+    <section id="results">
+      {% for media in results %}
+        <article>
+          <h5>{{ media['mtype']|capitalize() }}:</h5>
+            <a href="{{ url_for('mediainfo', mtype=media['mtype'], mid=media['id']) + '?q=' + query }}">
+              <img src="{{ img_base_url + media['poster_path'] }}">
+              <p>{{ media['title'] }} ({{ media['release_date'][:4] }})</p>
             </a>
-          </div>
+        </article>
       {% endfor %}
-      {% endif %}
-
-      {% if shows and shows['results'] %}
-      {% for sh in shows['results'][:3] %}
-          <div class="col-md-2">
-            <div>Show:</div>
-            <a href="{{ url_for('mediainfo', mtype='show', mid=sh['id']) + '?q=' + query }}">
-              <img src="{{ img_base_url + sh['poster_path'] }}">
-              <div>{{ sh['name'] }} ({{ sh['first_air_date'][:4] }})</div>
-            </a>
-          </div>
-      {% endfor %}
-      {% endif %}
-    </div>
+    </section>
 
 {% endblock %}

@@ -198,6 +198,8 @@ def search(mtype='movie', query=''):
         mv['results'] = [m for m in mv['results'][:1]] + pop_after_first
         mv['results'] = [m for m in mv['results'] if m['release_date']]
         mv['results'] = [m for m in mv['results'] if m['poster_path']]
+        for m in mv['results']:
+            m['mtype'] = 'movie'
     if mtype == 'show' or mtype == 'all':
         sh = themoviedb_search(query, 'show')
         pop_after_first = [m for m in sh['results'][1:]
@@ -205,6 +207,10 @@ def search(mtype='movie', query=''):
         sh['results'] = [m for m in sh['results'][:1]] + pop_after_first
         sh['results'] = [m for m in sh['results'] if m['first_air_date']]
         sh['results'] = [m for m in sh['results'] if m['poster_path']]
+        for m in sh['results']:  # prep data for template
+            m['title'] = m['name']
+            m['release_date'] = m['first_air_date']
+            m['mtype'] = 'show'
 
     # if neither have results render template without sending media
     if (len(mv['results']) + len(sh['results']) == 0):
@@ -213,15 +219,15 @@ def search(mtype='movie', query=''):
     # if just one has results, go directly to media info page
     elif len(sh['results']) == 0 and len(mv['results']) == 1:
         return redirect(url_for('mediainfo', mtype='movie',
-                                mid=mv['results'][0]['id'], q=query))
+                                mid=mv['results'][0]['id'], query=query))
     elif len(mv['results']) == 0 and len(sh['results']) == 1:
         return redirect(url_for('mediainfo', mtype='show',
-                                mid=sh['results'][0]['id'], q=query))
+                                mid=sh['results'][0]['id'], query=query))
 
     # display multiple results (without sources) for user to choose
     else:
-        return render_template('searchresults.html', shows=sh, movies=mv,
-                               query=query)
+        res = mv['results'][:5] + sh['results'][:5]
+        return render_template('searchresults.html', query=query, results=res)
 
 
 # search themoviedb via user query or scraped title
@@ -567,8 +573,7 @@ def get_media_recs():
     # get media with at least 2 sources not being amazon_pay
     return db.Media.aggregate([
                 {'$match': {'$and': [ {'sources.1': {'$exists': True}},
-                                      {'sources.0.name': {'$ne': 'amazon_pay'}},
-                                      {'sources.1.name': {'$ne': 'amazon_pay'}}
+                                      {'sources.name': {'$nin': ['XXXamazon_pay']}}
                                     ]}},
                 {'$sample': {'size': 6}}
            ])   
