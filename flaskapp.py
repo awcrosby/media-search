@@ -573,7 +573,7 @@ def get_media_recs():
     # get media with at least 2 sources not being amazon_pay
     return db.Media.aggregate([
                 {'$match': {'$and': [ {'sources.1': {'$exists': True}},
-                                      {'sources.name': {'$nin': ['XXXamazon_pay']}}
+                                      {'sources.name': {'$nin': ['amazon_pay']}}
                                     ]}},
                 {'$sample': {'size': 6}}
            ])   
