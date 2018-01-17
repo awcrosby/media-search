@@ -6,7 +6,7 @@
 
     {% set img_base_url = 'https://image.tmdb.org/t/p/w154' %}
 
-    {% if not movies and not shows %}
+    {% if not results %}
         <h3>Your search for "{{ query }}" did not match any results.</h3>
     {% else %}
         <h3>Search results for: <strong>{{ query }}</strong></h3>
