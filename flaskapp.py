@@ -190,43 +190,46 @@ def search(mtype='movie', query=''):
     logging.info(u'user query, {}: {}'.format(mtype, query))
 
     # search via themoviedb api, take first result and any pop others
-    mv, sh, mv['results'], sh['results'] = ({}, {}, [], [])
+    mv, sh, movies, shows = ({}, {}, [], [])
+    movies, shows = ([], [])
     if mtype == 'movie' or mtype == 'all':
-        mv = themoviedb_search(query, 'movie')
-        pop_after_first = [m for m in mv['results'][1:]
-                           if m['vote_count'] >= 10 or m['popularity'] > 10]
-        mv['results'] = [m for m in mv['results'][:1]] + pop_after_first
-        mv['results'] = [m for m in mv['results'] if m['release_date']]
-        mv['results'] = [m for m in mv['results'] if m['poster_path']]
-        for m in mv['results']:
+        movies = themoviedb_search(query, 'movie')['results']
+
+        # take first result + popular, then keep if have date/poster
+        movies = [movies[0]] + [m for m in movies[1:] if m['vote_count'] >= 10
+                                or m['popularity'] > 10]
+        movies = [m for m in movies if m['release_date']]
+        movies = [m for m in movies if m['poster_path']]
+        for m in movies:  # prep data for template
             m['mtype'] = 'movie'
     if mtype == 'show' or mtype == 'all':
-        sh = themoviedb_search(query, 'show')
-        pop_after_first = [m for m in sh['results'][1:]
-                           if m['vote_count'] >= 10 or m['popularity'] > 10]
-        sh['results'] = [m for m in sh['results'][:1]] + pop_after_first
-        sh['results'] = [m for m in sh['results'] if m['first_air_date']]
-        sh['results'] = [m for m in sh['results'] if m['poster_path']]
-        for m in sh['results']:  # prep data for template
+        shows = themoviedb_search(query, 'show')['results']
+
+        # take first result + popular, then keep if have date/poster
+        shows = [shows[0]] + [m for m in shows[1:] if m['vote_count'] >= 10
+                              or m['popularity'] > 10]
+        shows = [m for m in shows if m['first_air_date']]
+        shows = [m for m in shows if m['poster_path']]
+        for m in shows:  # prep data for template
             m['title'] = m['name']
             m['release_date'] = m['first_air_date']
             m['mtype'] = 'show'
 
     # if neither have results render template without sending media
-    if (len(mv['results']) + len(sh['results']) == 0):
+    if (len(movies) + len(shows) == 0):
         return render_template('searchresults.html', query=query)
 
     # if just one has results, go directly to media info page
-    elif len(sh['results']) == 0 and len(mv['results']) == 1:
+    elif len(shows) == 0 and len(movies) == 1:
         return redirect(url_for('mediainfo', mtype='movie',
-                                mid=mv['results'][0]['id'], query=query))
-    elif len(mv['results']) == 0 and len(sh['results']) == 1:
+                                mid=movies[0]['id'], query=query))
+    elif len(movies) == 0 and len(shows) == 1:
         return redirect(url_for('mediainfo', mtype='show',
-                                mid=sh['results'][0]['id'], query=query))
+                                mid=shows[0]['id'], query=query))
 
     # display multiple results (without sources) for user to choose
     else:
-        res = mv['results'][:5] + sh['results'][:5]
+        res = movies[:5] + shows[:5]
         return render_template('searchresults.html', query=query, results=res)
 
 
