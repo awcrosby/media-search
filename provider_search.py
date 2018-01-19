@@ -187,7 +187,7 @@ def search_netflix():
         for page in genre_pages:
             # get page and scroll to bottom many times
             time.sleep(1.5)
-            driver.get(page)
+            driver.get(page + '?so=su')
             logging.info('did get on page: {}'.format(page))
             for i in range(40):
                 driver.execute_script(
