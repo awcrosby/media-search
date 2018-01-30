@@ -4,6 +4,7 @@ import requests
 # import requests_cache
 from bs4 import BeautifulSoup
 import json
+import re
 import time
 import random
 import logging
@@ -79,6 +80,11 @@ def search_hulu():
     # driver.find_element_by_id('recaptcha_response_field').send_keys('')
     form.find_element_by_tag_name('button').click()
     time.sleep(1.2)
+    try:  # sometimes first click does not work
+        form.find_element_by_tag_name('button').click()
+    except:
+        pass
+    time.sleep(1.2)
 
     # switch out of iframe and click profile link
     driver.find_element_by_id('62038018').click()
@@ -105,13 +111,23 @@ def search_hulu():
             while True:
                 thumbnails = top_panel.find_elements_by_class_name('row')
                 for t in thumbnails:
+                    try:  # get movie year for tmdb search, NA for shows
+                        year = t.find_element_by_tag_name('img')
+                        year = year.get_attribute('alt')
+                        if re.search('\([0-9][0-9][0-9][0-9]\)$', year):
+                            year = year[-5:-1]
+                        else:
+                            year = ''
+                    except:
+                        year = ''
                     try:
                         title = t.find_element_by_class_name('title')
                         title = title.get_attribute('innerHTML')
                         # logging.info('title in html found: {}'.format(title))
                         link = t.find_element_by_class_name('beacon-click')
                         link = link.get_attribute('href')
-                        medias += [{'title': title, 'link': link}]
+                        medias += [{'title': title, 'link': link,
+                                    'year': year}]
                     except NoSuchElementException:
                         logging.warning('no title in row html, blank grid')
                         # with open('log/selenium_error_html_dump.txt',
@@ -133,7 +149,7 @@ def search_hulu():
                     break  # exit loop, pages should never be this long
                 time.sleep(float(random.randrange(1900, 2300, 1))/1000)
             logging.info('len(medias) so far: {}'.format(len(medias)))
-        return medias  # TODO test counter and len(media) placement
+        return medias
 
     # MOVIE SEARCH SECTION
     logging.info('HULU MOVIE SEARCH')
@@ -187,7 +203,7 @@ def search_netflix():
         for page in genre_pages:
             # get page and scroll to bottom many times
             time.sleep(1.5)
-            driver.get(page)
+            driver.get(page + '?so=su')
             logging.info('did get on page: {}'.format(page))
             for i in range(40):
                 driver.execute_script(
@@ -398,16 +414,20 @@ def lookup_and_write_medias(medias, mtype, source):
 
         # link url was not in database, therefore do themoviedb search
         time.sleep(0.2)
-        results = flaskapp.themoviedb_search(m['title'], mtype)
+        if 'year' in m.keys():
+            year = m['year']
+        else:
+            year = ''
+        results = flaskapp.themoviedb_search(m['title'], mtype, year=year)
 
         # exit iteration if search not complete or no results
         if 'total_results' not in results:
-            logging.error(u'tmdb search not complete for {}: {}'.format(
-                          mtype, m['title']))
+            logging.error(u'tmdb search not complete for {}: {} {}'.format(
+                          mtype, m['title'], year))
             continue
         if results['total_results'] < 1:
-            logging.warning(u'tmdb 0 results for {}: {}'.format(
-                            mtype, m['title']))
+            logging.warning(u'tmdb 0 results for {}: {} {}'.format(
+                            mtype, m['title'], year))
             continue
 
         # assume top result is best match and use it

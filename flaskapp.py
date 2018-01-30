@@ -233,13 +233,17 @@ def search(mtype='movie', query=''):
 
 
 # search themoviedb via user query or scraped title
-def themoviedb_search(query, mtype):
+def themoviedb_search(query, mtype, year=''):
     tmdb_url = 'https://api.themoviedb.org/3/search/'
     with open('creds.json', 'r') as f:
         params = {'api_key': json.loads(f.read())['tmdb']}
 
+    # if year was passed, used as a search param
+    if mtype == 'movie' and year:
+        params['year'] = year
+
     # if year is in query, remove and use as search param
-    if re.search('\([0-9][0-9][0-9][0-9]\)$', query):
+    if mtype == 'movie' and re.search('\([0-9][0-9][0-9][0-9]\)$', query):
         title_year = query[-5:-1]
         query = query[:-6].strip()
         params['year'] = title_year
