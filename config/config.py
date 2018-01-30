@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # config.py
-"""Configuration for Flask app"""
+"""Template configuration for Flask app, copy to root of project"""
 
 
 class Config(object):
