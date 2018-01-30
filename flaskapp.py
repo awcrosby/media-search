@@ -267,8 +267,8 @@ def mediainfo(mtype='', mid=None):
         return redirect(url_for('home'))
 
     # check if this title/year avail on amz, if so write to db
-    amz_prime_check(api_media)
-    amz_pay_check(api_media)
+    #amz_prime_check(api_media)
+    #amz_pay_check(api_media)
 
     # get media from db to check for sources
     db_media = get_media_from_db(mtype, mid)

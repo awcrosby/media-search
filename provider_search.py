@@ -30,7 +30,7 @@ def main():
     search_netflix()
     search_showtime()
     search_hbo()
-    update_watchlist_amz()
+    #update_watchlist_amz()
     flaskapp.remove_hulu_addon_media()
     flaskapp.reindex_database()
 
