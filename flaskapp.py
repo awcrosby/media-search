@@ -1,6 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # flaskapp.py
+""" Flask website to create user watchlist of media with streaming sources.
+    User media search queries use themoviedb api to resolve.
+    Media streaming sources via local database.
+"""
 
 from flask import (Flask, render_template, request, redirect,
                    url_for, flash, session, json, abort)
@@ -18,28 +22,18 @@ from bs4 import BeautifulSoup
 import urllib
 #from media_api import WatchlistAPI, ItemAPI  # api for this flask app
 from flask_restful import Api, reqparse, Resource
-app = Flask(__name__)
-db = pymongo.MongoClient('localhost', 27017).MediaData
 
-# set up api and resource routing
-api = Api(app)
-#api.add_resource(WatchlistAPI, '/api/watchlist')
-#api.add_resource(ItemAPI, '/api/item/<mtype>/<int:mid>')
-
-'''webframework flaskapp high-level functionality:
-    user search query via themoviedb api, results with links to specific media
-    lookup movie info from database
-    display streaming sources by type, with links and show ep info
-    support user login to create and edit a watchlist'''
-
+app = Flask(__name__)  # init flask app
+app.config.from_object('config.Config')  # load config from config.py
+db = pymongo.MongoClient(app.config['MONGO_URI']).MediaData  # connect to db
+api = Api(app)  # init local api
 logging.basicConfig(filename='log/flaskapp.log',
                     format='%(asctime)s %(levelname)s: %(message)s',
                     level=logging.INFO)
-app.secret_key = '3d6gtrje6d2rffe2jqkv'
 
 
-# initialize database by creating collection and unique index
 def init_database():
+    """Initialize database by creating collection and unique index"""
     db.Media.create_index([('mtype', pymongo.ASCENDING),
                            ('id', pymongo.ASCENDING)], unique=True)
     db.Users.create_index('email', unique=True)
@@ -729,7 +723,3 @@ class ItemAPI(Resource):
 api.add_resource(WatchlistAPI, '/api/watchlist')
 api.add_resource(UserAPI, '/api/user')
 api.add_resource(ItemAPI, '/api/item/<mtype>/<int:mid>')
-
-
-if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=8181)
