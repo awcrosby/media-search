@@ -3,8 +3,8 @@
 
 {% block body %}
     <h2>
-      Register to Create Watchlist
-      <small>or <a href="{{ url_for('login') }}">log in</a></small>
+      Sign up to Create Watchlist
+      <small>or <a href="{{ url_for('login') }}">sign in</a></small>
     </h2>
     {% from 'includes/_formhelpers.html' import render_field %}
     <form method="POST" action="">
@@ -17,7 +17,7 @@
           <td><div class="form-group">{{ render_field(form.password, class='form-control') }}</div></td>
           <td><div class="form-group">{{ render_field(form.confirm, class='form-control') }}</div></td>
       </table>
-      <input type="submit" class="btn btn-primary" value="Submit">
+      <button type="submit" class="btn btn-primary">Sign up</button>
     </form>
     <div style="margin-top: 35px;">
       <h3>Watchlist example:</h3>
