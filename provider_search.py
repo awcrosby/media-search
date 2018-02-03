@@ -223,6 +223,19 @@ def search_netflix():
             logging.info('len(medias) so far: {}'.format(len(medias)))
         return medias
 
+    def get_netflix_year(medias):
+        """Get netflix year on media page if record not already in database"""
+        for media in medias:
+            if 'link' in media.keys():
+                if not flaskapp.db_lookup_via_link(media['link']):
+                    driver.get(media['link'])
+                    soup = BeautifulSoup(driver.page_source, 'html.parser')
+                    year = soup.find('span', 'year').text
+                    media['year'] = year
+                    logging.info('did year lookup:', media)
+            time.sleep(float(random.randrange(900, 1600, 1))/1000)
+        return medias
+
     # MOVIE SEARCH SECTION
     logging.info('NETFLIX MOVIE SEARCH')
     genre_pages = [
@@ -243,6 +256,7 @@ def search_netflix():
                    'https://www.netflix.com/browse/genre/8933'  # thrillers
                   ]
     medias = get_medias_from_genre_pages(genre_pages)
+    medias = get_netflix_year(medias)
     lookup_and_write_medias(medias, mtype='movie', source=source)
 
     # SHOW SEARCH SECTION
@@ -259,6 +273,7 @@ def search_netflix():
                    'https://www.netflix.com/browse/genre/46553'  # classic
                   ]
     medias = get_medias_from_genre_pages(genre_pages)
+    medias = get_netflix_year(medias)
     lookup_and_write_medias(medias, mtype='show', source=source)
 
     driver.quit()
