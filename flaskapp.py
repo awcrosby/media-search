@@ -595,6 +595,11 @@ def insert_media_if_new(media):
     return
 
 
+def insert_netflix_medias_list(medias, mtype):
+    db.NetflixMedias.insert_one({'list': medias, 'mtype': mtype})
+    return
+
+
 def update_media_with_source(media, source):
     # get media from database and exit if errors
     m = db.Media.find_one({'mtype': media['mtype'],
