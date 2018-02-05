@@ -179,10 +179,46 @@ def search_hulu():
     flaskapp.remove_old_sources('hulu')
 
 
+def write_stream2tmdb(medias, mtype, source):
+    """Write collection to map stream service id to tmdb id"""
+    for m in medias:
+        # based on title and year get tmdb_id via tmdb search
+        if not 'year' in m.keys():
+            m['year'] = ''
+        results = flaskapp.themoviedb_search(m['title'], mtype, year=m['year'])
+        if 'total_results' not in results or results['total_results'] < 1:
+            continue
+
+        # via tmdb_id get full_media from stream2tmdb collection, or tmdb lookup
+        full_media = flaskapp.lookup_stream2tmdb(mtype, results['results'][0]['id'])
+        if not full_media:
+            full_media = flaskapp.themoviedb_lookup(mtype, results['results'][0]['id'])
+
+        # if source_id in full_media, no action needed
+        if (source + '_id') in full_media.keys():
+            continue
+
+        # add source info to full media
+        if source == 'netflix':
+            full_media['netflix_link'] = m['link']
+            full_media['netflix_id'] = m['link'].split('/')[-1]
+            full_media['netflix_title'] = m['title']
+            full_media['netflix_year'] = m['year']
+        flaskapp.upsert_stream2tmdb(mtype, full_media)
+
+
 def get_netflix_year(medias):
     """Get netflix year on media page if record not already in database"""
     medias = [dict(t) for t in set([tuple(d.items()) for d in medias])]
-    for media in medias:
+
+    # added for indie search
+    driver = webdriver.PhantomJS(service_log_path='log/phantomjs.log')
+    driver.implicitly_wait(10)  # seconds
+    driver.set_window_size(1920, 1080)
+
+    for index, media in enumerate(medias):
+        if index % 10 == 0:
+            logging.info('CURRENTLY AT MEDIA #{} OF {}'.format(index, len(medias)))
         if 'link' in media.keys():
             if not flaskapp.db_lookup_via_link(media['link']):
                 try:
@@ -191,10 +227,11 @@ def get_netflix_year(medias):
                     year = soup.find('span', 'year').text
                     media['year'] = year
                     logging.info('did year lookup: {}'.format(media))
+                    flaskapp.insert_netflix_medias_list(media)
                 except:
                     pass
-        time.sleep(float(random.randrange(900, 1600, 1))/1000)
-    return medias
+        time.sleep(float(random.randrange(10000, 20000, 1))/1000)
+    return 
 
 
 def search_netflix():
