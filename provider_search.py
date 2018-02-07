@@ -111,7 +111,7 @@ def search_hulu():
             while True:
                 thumbnails = top_panel.find_elements_by_class_name('row')
                 for t in thumbnails:
-                    try:  # get movie year for tmdb search, NA for shows
+                    try:  # get movie year / show first air year for tmdb search
                         year = t.find_element_by_tag_name('img')
                         year = year.get_attribute('alt')
                         if re.search('\([0-9][0-9][0-9][0-9]\)$', year):

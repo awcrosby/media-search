@@ -235,6 +235,8 @@ def themoviedb_search(query, mtype, year=''):
     # if year was passed, used as a search param
     if mtype == 'movie' and year:
         params['year'] = year
+    elif mtype == 'show' and year:
+        params['first_air_date_year'] = year
 
     # if year is in query, remove and use as search param
     if mtype == 'movie' and re.search('\([0-9][0-9][0-9][0-9]\)$', query):
@@ -595,8 +597,8 @@ def insert_media_if_new(media):
     return
 
 
-def insert_netflix_medias_list(medias, mtype):
-    db.NetflixMedias.insert_one({'list': medias, 'mtype': mtype})
+def insert_netflix_medias_list(media):
+    db.NetflixShows.update({'link': media['link']}, media, upsert=True)
     return
 
 
