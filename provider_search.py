@@ -29,8 +29,8 @@ def main():
 
     search_hulu()
     search_netflix()
-    search_showtime()
-    search_hbo()
+    #search_showtime()
+    #search_hbo()
     #update_watchlist_amz()
     flaskapp.remove_hulu_addon_media()
     flaskapp.reindex_database()
@@ -52,8 +52,7 @@ def search_hulu():
     # source dict to be added to media sources[] in db for found titles
     source = {'name': 'hulu',
               'display_name': 'Hulu',
-              'link': 'http://www.hulu.com',
-              'type': 'subscription_web_sources'}
+              'link': 'http://www.hulu.com'}
 
     # go to hulu splash page
     driver = webdriver.PhantomJS(service_log_path='log/phantomjs.log')
@@ -244,8 +243,7 @@ def search_netflix():
     base_url = 'http://www.netflix.com'
     source = {'name': 'netflix',
               'display_name': 'Netflix',
-              'link': base_url,
-              'type': 'subscription_web_sources'}
+              'link': base_url}
 
     # log in to provider
     driver = webdriver.PhantomJS(service_log_path='log/phantomjs.log')
@@ -333,8 +331,7 @@ def search_showtime():
     base_url = 'http://www.sho.com'
     source = {'name': 'showtime',
               'display_name': 'Showtime',
-              'link': base_url,
-              'type': 'subscription_web_sources'}
+              'link': base_url}
 
     # MOVIE SEARCH SECTION
     logging.info('SHOWTIME MOVIE SEARCH')
@@ -413,8 +410,7 @@ def search_hbo():
     base_url = 'https://play.hbogo.com'
     source = {'name': 'hbo',
               'display_name': 'HBO',
-              'link': base_url,
-              'type': 'subscription_web_sources'}
+              'link': base_url}
 
     # set up phantomjs browser
     driver = webdriver.PhantomJS(service_log_path='log/phantomjs.log')

@@ -278,6 +278,10 @@ def mediainfo(mtype='', mid=None):
     # set media to be combo of api and whatever in db
     media = api_media.copy()
     if db_media:
+        if not db_media.get('poster_path', ''):
+            db_media.pop('poster_path', '')  # if empty then delete
+        if not db_media.get('year', ''):
+            db_media.pop('year', '')  # if empty then delete
         media.update(db_media)
 
     # sort and get json version of sources for javascript to use 
@@ -563,7 +567,7 @@ def doTitlesMatch(t1, t2):
         t = t.replace('original classic ', '')
         for x in ['season', 'ssn', 'series', 'volume', 'blu-ray', '(', ':']:
             t = t.split(x)[0]  # take left of word, for amz seasons
-        t = t.translate({ord(c): None for c in "'’-,[]()"}).strip()  # remove
+        t = t.translate({ord(c): None for c in "'’-.:,[]()"}).strip()  # remove
         # logging.info(t)
         return t
         # note: when ignore right of ':' bad for 'Tron' != 'Tron: Legacy'
@@ -581,7 +585,8 @@ def get_media_recs():
     # get media with at least 2 sources not being amazon_pay
     return db.Media.aggregate([
                 {'$match': {'$and': [ {'sources.1': {'$exists': True}},
-                                      {'sources.name': {'$nin': ['amazon_pay']}}
+                                      {'sources.name': {'$nin': ['amazon_pay']}},
+                                      {'poster_path': {'$nin': [None, '']}}
                                     ]}},
                 {'$sample': {'size': 6}}
            ])   
@@ -600,11 +605,6 @@ def insert_media_if_new(media):
                               'id': media['id']}):
         db.Media.insert_one(media)
         logging.info(u'db wrote new media: {}'.format(media['title']))
-    return
-
-
-def insert_netflix_medias_list(media):
-    db.NetflixShows.update({'link': media['link']}, media, upsert=True)
     return
 
 
