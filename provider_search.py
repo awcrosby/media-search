@@ -111,7 +111,7 @@ def search_hulu():
             while True:
                 thumbnails = top_panel.find_elements_by_class_name('row')
                 for t in thumbnails:
-                    try:  # get movie year / show first air year for tmdb search
+                    try:  # get movie year, show first air year not displayed
                         year = t.find_element_by_tag_name('img')
                         year = year.get_attribute('alt')
                         if re.search('\([0-9][0-9][0-9][0-9]\)$', year):
@@ -208,30 +208,35 @@ def write_stream2tmdb(medias, mtype, source):
 
 
 def get_netflix_year(medias):
-    """Get netflix year on media page if record not already in database"""
+    """Get netflix year on movie page if record not already in database"""
+    # netflix show year is recent not first air year, cant use in tmdb search
     medias = [dict(t) for t in set([tuple(d.items()) for d in medias])]
+    logging.info('unique medias in get_netflix_year(): {}'.format(len(medias)))
 
-    # added for indie search
-    driver = webdriver.PhantomJS(service_log_path='log/phantomjs.log')
-    driver.implicitly_wait(10)  # seconds
-    driver.set_window_size(1920, 1080)
+    # use browser, no need to sign in
+    driver2 = webdriver.PhantomJS(service_log_path='log/phantomjs.log')
+    driver2.implicitly_wait(10)  # seconds
+    driver2.set_window_size(1920, 1080)
 
-    for index, media in enumerate(medias):
-        if index % 10 == 0:
-            logging.info('CURRENTLY AT MEDIA #{} OF {}'.format(index, len(medias)))
+    count = 0
+    for i, media in enumerate(medias):
+        if count >= 190:
+            logging.error('Exiting get_netflix_year early via counter')
+            break
         if 'link' in media.keys():
             if not flaskapp.db_lookup_via_link(media['link']):
-                try:
-                    driver.get(media['link'])
-                    soup = BeautifulSoup(driver.page_source, 'html.parser')
+                time.sleep(float(random.randrange(20000, 30000, 1))/1000)
+                try:  # only for new media not in database
+                    count += 1
+                    driver2.get(media['link'])
+                    soup = BeautifulSoup(driver2.page_source, 'html.parser')
                     year = soup.find('span', 'year').text
                     media['year'] = year
-                    logging.info('did year lookup: {}'.format(media))
-                    flaskapp.insert_netflix_medias_list(media)
+                    logging.info('Media #{} YEAR LOOKUP #{}: {}'.format(i, count, media))
                 except:
                     pass
-        time.sleep(float(random.randrange(10000, 20000, 1))/1000)
-    return 
+    driver2.quit()
+    return medias
 
 
 def search_netflix():
@@ -298,9 +303,8 @@ def search_netflix():
                    'https://www.netflix.com/browse/genre/8933'  # thrillers
                   ]
     medias = get_medias_from_genre_pages(genre_pages)
-    #medias = get_netflix_year(medias)
-    #lookup_and_write_medias(medias, mtype='movie', source=source)
-    flaskapp.insert_netflix_medias_list(medias, mtype='movie')
+    medias = get_netflix_year(medias)
+    lookup_and_write_medias(medias, mtype='movie', source=source)
 
     # SHOW SEARCH SECTION
     logging.info('NETFLIX SHOW SEARCH')
@@ -316,9 +320,7 @@ def search_netflix():
                    'https://www.netflix.com/browse/genre/46553'  # classic
                   ]
     medias = get_medias_from_genre_pages(genre_pages)
-    #medias = get_netflix_year(medias)
-    #lookup_and_write_medias(medias, mtype='show', source=source)
-    flaskapp.insert_netflix_medias_list(medias, mtype='show')
+    lookup_and_write_medias(medias, mtype='show', source=source)
 
     driver.quit()
 
@@ -473,10 +475,7 @@ def lookup_and_write_medias(medias, mtype, source):
 
         # link url was not in database, therefore do themoviedb search
         time.sleep(0.2)
-        if 'year' in m.keys():
-            year = m['year']
-        else:
-            year = ''
+        year = m.get('year', '')
         results = flaskapp.themoviedb_search(m['title'], mtype, year=year)
 
         # exit iteration if search not complete or no results
@@ -487,25 +486,31 @@ def lookup_and_write_medias(medias, mtype, source):
         if results['total_results'] < 1:
             logging.warning(u'tmdb 0 results for {}: {} {}'.format(
                             mtype, m['title'], year))
-            continue
-
-        # assume top result is best match and use it
-        full_media = results['results'][0]
-
-        # append data so dict can be saved to database
-        full_media['mtype'] = mtype
-        full_media['sources'] = []
-        if mtype == 'movie':
-            full_media['year'] = full_media['release_date'][:4]
+            # empty media for db write, prevent re-searching
+            full_media = dict()
+            full_media['title'] = m['title']
+            full_media['mtype'] = mtype
+            full_media['year'] = year
+            full_media['id'] = m['link']
+            full_media['sources'] = []
         else:
-            full_media['title'] = full_media['name']
-            full_media['year'] = full_media['first_air_date'][:4]
-        # logging.info(u'tmdb found {}: {}'.format(mtype, full_media['title']))
+            # assume top result is best match and use it
+            full_media = results['results'][0]
 
-        # check if titles are not exact match, in future may not append these
-        if not flaskapp.doTitlesMatch(m['title'], full_media['title']):
-            logging.warning(u'not exact titles: {} | {}'.format(
-                            m['title'], full_media['title']))
+            # append data so dict can be saved to database
+            full_media['mtype'] = mtype
+            full_media['sources'] = []
+            if mtype == 'movie':
+                full_media['year'] = full_media['release_date'][:4]
+            else:
+                full_media['title'] = full_media['name']
+                full_media['year'] = full_media['first_air_date'][:4]
+            # logging.info(u'tmdb found {}: {}'.format(mtype, full_media['title']))
+
+            # check if titles are not exact match, in future may not append these
+            if not flaskapp.doTitlesMatch(m['title'], full_media['title']):
+                logging.warning(u'not exact titles: {} | {}'.format(
+                                m['title'], full_media['title']))
 
         # write db media if new
         flaskapp.insert_media_if_new(full_media)

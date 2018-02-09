@@ -232,17 +232,19 @@ def themoviedb_search(query, mtype, year=''):
     with open('creds.json', 'r') as f:
         params = {'api_key': json.loads(f.read())['tmdb']}
 
-    # if year was passed, used as a search param
-    if mtype == 'movie' and year:
-        params['year'] = year
-    elif mtype == 'show' and year:
-        params['first_air_date_year'] = year
-
-    # if year is in query, remove and use as search param
-    if mtype == 'movie' and re.search('\([0-9][0-9][0-9][0-9]\)$', query):
-        title_year = query[-5:-1]
-        query = query[:-6].strip()
-        params['year'] = title_year
+    # use year as search param if passed in or in title
+    if mtype == 'movie':
+        if year:
+            params['year'] = year
+        if re.search('\([0-9][0-9][0-9][0-9]\)$', query):
+            params['year'] = query[-5:-1]
+            query = query[:-6].strip()
+    elif mtype == 'show':
+        if year:
+            params['first_air_date_year'] = year
+        if re.search('\([0-9][0-9][0-9][0-9]\)$', query):
+            params['first_air_date_year'] = query[-5:-1]
+            query = query[:-6].strip() 
 
     # lookup media dict from themoviedb
     params['query'] = query
@@ -282,6 +284,10 @@ def mediainfo(mtype='', mid=None):
     sources = media['sources']
     sources = sorted(sources, key=lambda k: k['name'] == 'amazon_pay')
     sources = json.dumps(sources)
+
+    # replace a poster_path of None with '' to avoid error to user
+    if not media.get('poster_path', ''):
+        media['poster_path'] = ''
 
     return render_template('mediainfo.html', media=media,
                            mtype=mtype, sources=sources, query=query)
