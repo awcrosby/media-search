@@ -27,9 +27,9 @@ def main():
                         level=logging.INFO)
     # requests_cache.install_cache('demo_cache')
 
-    search_hulu()
+    #search_hulu()
     search_netflix()
-    #search_showtime()
+    search_showtime()
     #search_hbo()
     #update_watchlist_amz()
     flaskapp.remove_hulu_addon_media()
@@ -448,16 +448,16 @@ def search_hbo():
             medias += [{'title': title, 'link': base_url + b['href']}]
 
         # get year if not already in database
-        for m in medias:
-            if not flaskapp.db_lookup_via_link(m['link']):
-                driver.get(m['link'])
-                time.sleep(float(random.randrange(15000, 20000, 1))/1000)
-                soup = BeautifulSoup(driver.page_source, 'html.parser')
-                texts = soup.findAll(text=True)  # get visible text
-                years = [t for t in texts if re.search('^\d{4}.+min$', t)]
-                if len(years) > 0:
-                    m['year'] = years[0][:4]
-                print('year lookup: {}: {}'.format(m['title'], m.get('year', '')))
+        #for m in medias:
+        #    if page['mtype'] == 'movie' and not flaskapp.db_lookup_via_link(m['link']):
+        #        driver.get(m['link'])
+        #        time.sleep(float(random.randrange(15000, 18000, 1))/1000)
+        #        soup = BeautifulSoup(driver.page_source, 'html.parser')
+        #        texts = soup.findAll(text=True)  # get visible text
+        #        years = [t for t in texts if re.search('^\d{4}.+min$', t)]
+        #        if len(years) > 0:
+        #            m['year'] = years[0][:4]
+        #        logging.info('year lookup: {}: {}'.format(m['title'], m.get('year', '')))
 
         lookup_and_write_medias(medias, mtype=page['mtype'], source=source)
 
