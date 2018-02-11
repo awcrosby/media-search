@@ -373,14 +373,18 @@ def search_showtime():
 
     # check availability via link, build medias list
     medias = []
-    for c in enumerate(catalog):
+    for i, c in enumerate(catalog):
         time.sleep(0.100)
-        r = requests.get(c[1]['link'])
+        r = requests.get(c['link'])
         soup = BeautifulSoup(r.text, 'html.parser')
+
+        year = soup.find_all('dd')[-1].text
+        if year and re.search('^\d{4}$', year):
+            c['year'] = year
         if soup.find(text='STREAM THIS MOVIE'):
-            medias += [c[1]]
-        if c[0] and c[0] % 100 == 0:
-            logging.info(u'checked availability on {} items'.format(c[0]))
+            medias += [c]
+        if i % 100 == 0:
+            logging.info(u'checked availability on {} items'.format(i))
 
     lookup_and_write_medias(medias, mtype='movie', source=source)
 
@@ -442,6 +446,19 @@ def search_hbo():
         for b in boxes:
             title = b.text.replace('\n', ' ')
             medias += [{'title': title, 'link': base_url + b['href']}]
+
+        for m in medias:
+            driver.get(m['link'])
+            time.sleep(12)
+            soup = BeautifulSoup(driver.page_source, 'html.parser')
+            texts = soup.findAll(text=True)  # get visible text
+            try:
+                year = [t for t in texts if re.search('^\d{4}.+min$', t)][0][:4]
+                m['year'] = year
+            except:
+                pass
+            got_year = m.get('year', 'NONE')
+            print('media: {} year: {}'.format(m['title'], got_year))
 
         lookup_and_write_medias(medias, mtype=page['mtype'], source=source)
 
