@@ -410,54 +410,49 @@ def search_showtime():
 
 
 def search_hbo():
-    # source dict to be added to media sources[] in db for found titles
-    base_url = 'https://play.hbogo.com'
-    source = {'name': 'hbo',
-              'display_name': 'HBO',
-              'link': base_url}
-
-    # set up phantomjs browser
     driver = webdriver.PhantomJS(service_log_path='log/phantomjs.log')
     driver.implicitly_wait(10)  # seconds
     driver.set_window_size(1920, 15000)
 
-    pages = [
-              {'url': '/movies', 'mtype': 'movie'},
+    base_url = 'https://play.hbogo.com'
+    source = {'name': 'hbo', 'display_name': 'HBO', 'link': base_url}
+    pages = [{'url': '/movies', 'mtype': 'movie'},
               {'url': '/series', 'mtype': 'show'},
-              {'url': '/documentaries', 'mtype': 'movie'}
-            ]
+              {'url': '/documentaries', 'mtype': 'movie'}]
 
     for page in pages:
         logging.info('HBO SEARCH OF ' + page['url'])
         driver.get(base_url + page['url'])
-        time.sleep(20)
-        soup = BeautifulSoup(driver.page_source, 'html.parser')
-
-        # remove certain divs that have links that are not media
-        for div in soup.find_all('div', 'default class1 class6'):
-            div.decompose()
+        time.sleep(5)
+        driver.execute_script("window.scrollTo(0, 10000);")
+        time.sleep(15)
 
         # get all boxes with media image and text
-        boxes = soup.find_all('a', 'default class2 class4')
+        boxes = driver.find_elements_by_xpath("//a[@class='default class2 class4']")
         logging.info(u'num of media boxes found: {}'.format(len(boxes)))
 
         # create list of titles and links, replacing newline
         medias = []
-        for b in boxes:
+        for i, b in enumerate(boxes):
             title = b.text.replace('\n', ' ')
-            medias += [{'title': title, 'link': base_url + b['href']}]
+            medias += [{'title': title, 'link': b.get_attribute('href')}]
+
+        # remove non-media, TODO make not catch false positives
+        medias = [m for m in medias if not m['title'].isupper()]
 
         # get year if not already in database
-        #for m in medias:
-        #    if page['mtype'] == 'movie' and not flaskapp.db_lookup_via_link(m['link']):
-        #        driver.get(m['link'])
-        #        time.sleep(float(random.randrange(15000, 18000, 1))/1000)
-        #        soup = BeautifulSoup(driver.page_source, 'html.parser')
-        #        texts = soup.findAll(text=True)  # get visible text
-        #        years = [t for t in texts if re.search('^\d{4}.+min$', t)]
-        #        if len(years) > 0:
-        #            m['year'] = years[0][:4]
-        #        logging.info('year lookup: {}: {}'.format(m['title'], m.get('year', '')))
+        logging.info('getting year for all media not in database')
+        for m in medias:
+            if page['mtype'] == 'movie' and not flaskapp.db_lookup_via_link(m['link']):
+                driver.get(m['link'])
+                time.sleep(float(random.randrange(5000, 10000, 1))/1000)
+                texts = driver.find_element_by_tag_name("body").text
+                texts = texts.split('\n')
+
+                years = [t for t in texts if re.search('^\d{4}.+min$', t)]
+                if len(years) > 0:
+                    m['year'] = years[0][:4]
+                logging.info('year lookup: {}: {}'.format(m['title'], m.get('year', '')))
 
         lookup_and_write_medias(medias, mtype=page['mtype'], source=source)
 
