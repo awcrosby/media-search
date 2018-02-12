@@ -82,9 +82,9 @@ class ProviderSearch():
             medias = [m for m in medias if not m['title'].isupper()]
 
             # get year if not already in database
-            logging.info('getting year for all media not in database')
+            logging.info('getting year for all movies not in database')
             for m in medias:
-                if not flaskapp.db_lookup_via_link(m['link']):
+                if page['mtype'] == 'movie' and not flaskapp.db_lookup_via_link(m['link']):
                     self.driver.get(m['link'])
                     sleep(randint(5,10))
                     texts = self.driver.find_element_by_tag_name("body").text
@@ -93,11 +93,116 @@ class ProviderSearch():
                     years = [t for t in texts if re.search('^\d{4}.+min$', t)]
                     if len(years) > 0:
                         m['year'] = years[0][:4]
-                    logging.info('year lookup: {}: {}'.format(m['title'],
-                                                              m.get('year', '')))
+                    logging.info('year lookup: {}: {}'.format(m['title'], m.get('year', '')))
 
             self.lookup_and_write_medias(medias, mtype=page['mtype'], source=source)
         self.stop_driver()
+
+    def search_hulu():
+        """Searches hulu for media"""
+
+        def get_medias_from_genre_pages(genre_pages):
+            medias = []
+            for page in genre_pages:
+                if page == 'https://www.hulu.com/videogames':
+                    continue
+                if page == 'https://www.hulu.com/latino':
+                    continue  # says movie genre but shows not movies
+                # get page and pointer to top panel, holding about 6 medias
+                self.driver.get(page)
+                logging.info('did get on page: {}'.format(page))
+                sleep(8)
+                top_panel = driver.find_element_by_class_name('tray')
+                next_btn = top_panel.find_element_by_class_name('next')
+                next_counter = 0
+
+                # get visible media, click next, repeat until no next button
+                while True:
+                    thumbnails = top_panel.find_elements_by_class_name('row')
+                    for t in thumbnails:
+                        try:  # get movie year, show first air year not displayed
+                            year = t.find_element_by_tag_name('img').get_attribute('alt')
+                            if re.search('\([0-9][0-9][0-9][0-9]\)$', year):
+                                year = year[-5:-1]
+                            else:
+                                year = ''
+                        except:
+                            year = ''
+                        try:
+                            title = t.find_element_by_class_name('title').get_attribute('innerHTML')
+                            link = t.find_element_by_class_name('beacon-click').get_attribute('href')
+                            medias += [{'title': title, 'link': link, 'year': year}]
+                        except NoSuchElementException:
+                            logging.warning('no title in row html, blank grid')
+                            continue
+                        except StaleElementReferenceException:
+                            logging.error('missed a title, may need to wait more')
+                            continue
+                    if not next_btn.is_displayed():
+                        break  # exit loop if next button is not displayed
+                    next_btn.click()
+                    next_counter += 1
+                    if next_counter % 10 == 0:
+                        logging.info('clicked next {} times'.format(next_counter))
+                    if next_counter >= 120:
+                        logging.error('next button never went away, may have ' +
+                                      'not gotten all media on: {}'.format(page))
+                        break  # exit loop, pages should never be this long
+                    sleep(randint(2,3))
+                logging.info('len(medias) so far: {}'.format(len(medias)))
+            return medias
+
+        logging.info('starting hulu search')
+        self.start_driver()
+        self.driver.get('https://auth.hulu.com/web/login')
+        source = {'name': 'hulu', 'display_name': 'Hulu', 'link': 'http://www.hulu.com'}
+        sleep(2)
+
+        # enter credentials and click login button
+        form = self.driver.find_element_by_tag_name('form')
+        form.find_element_by_name('email').send_keys(creds['hulu_u'])
+        form.find_element_by_name('password').send_keys(creds['hulu_p'])
+        # self.driver.save_screenshot('static/screenshot.png')
+        # self.driver.find_element_by_id('recaptcha_response_field').send_keys('')
+        form.find_element_by_class_name('login-button').click()
+        sleep(1.2)
+        try:  # sometimes first click does not work
+            form.find_element_by_class_name('login-button').click()
+            sleep(1.2)
+        except:
+            pass
+        logging.info('hulu, clicked login button')
+
+        # click profile link
+        self.driver.find_element_by_id('62038018').click()
+        sleep(1.2)
+        logging.info('hulu, clicked profile')
+
+        # MOVIE SEARCH SECTION
+        logging.info('HULU MOVIE SEARCH')
+        self.driver.get('https://www.hulu.com/movies/genres')
+        sleep(1.5)
+        all_genre = driver.find_element_by_id('all_movies_genres')
+        anchors = all_genre.find_elements_by_class_name('beacon-click')
+        genre_pages = [a.get_attribute('href') for a in anchors]
+        logging.info('hulu, got movie genres')
+        medias = get_medias_from_genre_pages(genre_pages)
+        lookup_and_write_medias(medias, mtype='movie', source=source)
+
+        # SHOW SEARCH SECTION
+        logging.info('HULU SHOW SEARCH')
+        self.driver.get('https://www.hulu.com/tv/genres')
+        sleep(1.5)
+        all_genre = driver.find_element_by_id('all_tv_genres')
+        anchors = all_genre.find_elements_by_class_name('beacon-click')
+        genre_pages = [a.get_attribute('href') for a in anchors]
+        logging.info('hulu, got tv genres')
+        medias = get_medias_from_genre_pages(genre_pages)
+        lookup_and_write_medias(medias, mtype='show', source=source)
+
+        self.stop_driver()
+        flaskapp.remove_old_sources('hulu')  # remove sources not just updated
+
 
     def lookup_and_write_medias(self, medias, mtype, source):
         # get unique: list of dict into list of tuples, set, back to dict
