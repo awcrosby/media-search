@@ -8,7 +8,6 @@ install google chrome in ubuntu: https://askubuntu.com/questions/510056/how-to-i
 chromedriver docs for quickstart: https://sites.google.com/a/chromium.org/chromedriver/getting-started
 set options for headless: https://stackoverflow.com/questions/46920243/
 start display before chrome: https://stackoverflow.com/questions/22424737/
-
 """
 
 from time import sleep
@@ -16,18 +15,19 @@ from random import randint
 from selenium import webdriver
 from pyvirtualdisplay import Display
 from selenium.webdriver.chrome.options import Options
+from selenium.common.exceptions import (NoSuchElementException, StaleElementReferenceException)
 import logging
 from bs4 import BeautifulSoup
 import re
 import flaskapp  # for db lookups/writes and logging
+import json
 
 CHROMEDRIVER_PATH = '/var/chromedriver/chromedriver'
 
 class ProviderSearch():
-    #def __init__(self):
-        #logging.basicConfig(filename='provider_search.log',
-        #                    format='%(asctime)s %(levelname)s: %(message)s',
-        #                    level=logging.INFO)
+    def __init__(self):
+        with open('creds.json', 'r') as f:
+            self.creds = json.loads(f.read())
 
     def start_driver(self, window_size='--window-size=1920,1080'):
         """Starts headless chrome browser/driver"""
@@ -98,7 +98,7 @@ class ProviderSearch():
             self.lookup_and_write_medias(medias, mtype=page['mtype'], source=source)
         self.stop_driver()
 
-    def search_hulu():
+    def search_hulu(self):
         """Searches hulu for media"""
 
         def get_medias_from_genre_pages(genre_pages):
@@ -112,7 +112,7 @@ class ProviderSearch():
                 self.driver.get(page)
                 logging.info('did get on page: {}'.format(page))
                 sleep(8)
-                top_panel = driver.find_element_by_class_name('tray')
+                top_panel = self.driver.find_element_by_class_name('tray')
                 next_btn = top_panel.find_element_by_class_name('next')
                 next_counter = 0
 
@@ -160,8 +160,8 @@ class ProviderSearch():
 
         # enter credentials and click login button
         form = self.driver.find_element_by_tag_name('form')
-        form.find_element_by_name('email').send_keys(creds['hulu_u'])
-        form.find_element_by_name('password').send_keys(creds['hulu_p'])
+        form.find_element_by_name('email').send_keys(self.creds['hulu_u'])
+        form.find_element_by_name('password').send_keys(self.creds['hulu_p'])
         # self.driver.save_screenshot('static/screenshot.png')
         # self.driver.find_element_by_id('recaptcha_response_field').send_keys('')
         form.find_element_by_class_name('login-button').click()
@@ -182,23 +182,23 @@ class ProviderSearch():
         logging.info('HULU MOVIE SEARCH')
         self.driver.get('https://www.hulu.com/movies/genres')
         sleep(1.5)
-        all_genre = driver.find_element_by_id('all_movies_genres')
+        all_genre = self.driver.find_element_by_id('all_movies_genres')
         anchors = all_genre.find_elements_by_class_name('beacon-click')
         genre_pages = [a.get_attribute('href') for a in anchors]
         logging.info('hulu, got movie genres')
         medias = get_medias_from_genre_pages(genre_pages)
-        lookup_and_write_medias(medias, mtype='movie', source=source)
+        self.lookup_and_write_medias(medias, mtype='movie', source=source)
 
         # SHOW SEARCH SECTION
         logging.info('HULU SHOW SEARCH')
         self.driver.get('https://www.hulu.com/tv/genres')
         sleep(1.5)
-        all_genre = driver.find_element_by_id('all_tv_genres')
+        all_genre = self.driver.find_element_by_id('all_tv_genres')
         anchors = all_genre.find_elements_by_class_name('beacon-click')
         genre_pages = [a.get_attribute('href') for a in anchors]
         logging.info('hulu, got tv genres')
         medias = get_medias_from_genre_pages(genre_pages)
-        lookup_and_write_medias(medias, mtype='show', source=source)
+        self.lookup_and_write_medias(medias, mtype='show', source=source)
 
         self.stop_driver()
         flaskapp.remove_old_sources('hulu')  # remove sources not just updated
@@ -268,5 +268,6 @@ class ProviderSearch():
             flaskapp.update_media_with_source(full_media, source_to_write)
 
 
-Search = ProviderSearch()
-Search.search_hbo()
+PS = ProviderSearch()
+#PS.search_hbo()
+PS.search_hulu()

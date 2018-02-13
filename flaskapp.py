@@ -567,8 +567,7 @@ def doTitlesMatch(t1, t2):
         t = t.replace('original classic ', '')
         for x in ['season', 'ssn', 'series', 'volume', 'blu-ray', '(', ':']:
             t = t.split(x)[0]  # take left of word, for amz seasons
-        t = t.translate({ord(c): None for c in "'’-.:,[]()"}).strip()  # remove
-        # logging.info(t)
+        t = t.translate({ord(c): None for c in "'’- .:,!?[]()"}).strip()  # remove
         return t
         # note: when ignore right of ':' bad for 'Tron' != 'Tron: Legacy'
         #       but good for 'Blade Runner: The Final Cut'
