@@ -11,7 +11,16 @@
         - git
         - nginx
         - fail2ban
-        - libfontconfig  # needed for phantomjs
+        - unzip
+    - name: Firewall turn on and allow OpenSSH
+      ufw: rule=allow name=OpenSSH state=enabled
+    - name: Firewall allow nginx https and http (for redirect to ssl)
+      ufw: rule=allow name="Nginx Full"
+
+
+- hosts: myhost  # playbook to install mongodb
+  become: true
+  tasks:
     - name: Add mongodb repo apt_key
       apt_key: keyserver=hkp://keyserver.ubuntu.com:80 id=EA312927
     - name: Add mongodb sources list
@@ -19,10 +28,30 @@
       changed_when: false
     - name: Update repositories cache and install "mongodb-org" package
       apt: name=mongodb-org update_cache=yes
-    - name: Firewall turn on and allow OpenSSH
-      ufw: rule=allow name=OpenSSH state=enabled
-    - name: Firewall allow nginx https and http (for redirect to ssl)
-      ufw: rule=allow name="Nginx Full"
+
+
+- hosts: myhost  # playbook to install chrome, chromedriver, dependencies
+  become: true
+  tasks:
+    - name: Add chrome repo apt_key
+      shell: "wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -"
+      changed_when: false
+    - name: Add chrome sources list
+      shell: "echo 'deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main' | sudo tee /etc/apt/sources.list.d/google-chrome.list"
+      changed_when: false
+    - name: Update repositories cache and install "google-chrome-stable" package
+      apt: name=google-chrome-stable update_cache=yes
+    - name: Install xvfb, dependency for chromedriver
+      package: name=xvfb state=latest
+    - name: make chromedriver directory
+      file: path=/var/chromedriver state=directory
+    - name: Download and unzip chromedriver
+      unarchive:
+        src: https://chromedriver.storage.googleapis.com/2.35/chromedriver_linux64.zip
+        dest: /var/chromedriver
+        remote_src: yes
+
+
 - hosts: myhost  # playbook to setup code environment
   vars:
     githubuser: awcrosby@gmail.com
@@ -73,21 +102,10 @@
       become: true
       service: name="{{item}}" state=started enabled=yes
       with_items: "{{newServices}}"
-    - name: Download phantomjs binary
-      get_url:
-        url: https://bitbucket.org/ariya/phantomjs/downloads/phantomjs-2.1.1-linux-x86_64.tar.bz2
-        dest: ~/phantomjs-2.1.1-linux-x86_64.tar.bz2
-    - name: Extract phantomjs tar
-      unarchive:
-        src: ~/phantomjs-2.1.1-linux-x86_64.tar.bz2
-        dest: ~/
-        remote_src: yes
-    - name: Copy phantomjs to dir in PATH variable
-      copy:
-        src: ~/phantomjs-2.1.1-linux-x86_64/bin/phantomjs
-        dest: ~/media-search/venv/bin/phantomjs
-        mode: u=rwx,g=rx,o=rx
-        remote_src: yes
+
+
+- hosts: myhost  # playbook to add crontab entries
+  tasks:
     - name: Add crontab entry for database backups
       cron:
         name: database backups

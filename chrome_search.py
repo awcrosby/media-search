@@ -17,10 +17,11 @@ from pyvirtualdisplay import Display
 from selenium.webdriver.chrome.options import Options
 from selenium.common.exceptions import (NoSuchElementException, StaleElementReferenceException)
 import logging
-from bs4 import BeautifulSoup
 import re
 import flaskapp  # for db lookups/writes and logging
 import json
+import requests
+from bs4 import BeautifulSoup
 
 CHROMEDRIVER_PATH = '/var/chromedriver/chromedriver'
 
@@ -48,6 +49,88 @@ class ProviderSearch():
         logging.info('stopping driver')
         self.display.stop()
         self.driver.quit()
+
+    def search_showtime(self):
+        """Searches showtime for media, uses lighter requests/bs4 not chrome"""
+        logging.info('starting showtime search')
+
+        base_url = 'http://www.sho.com'
+        source = {'name': 'showtime', 'display_name': 'Showtime', 'link': base_url}
+
+        # MOVIE SEARCH SECTION
+        logging.info('SHOWTIME MOVIE SEARCH')
+        r = requests.get(base_url + '/movies')
+        soup = BeautifulSoup(r.text, 'html.parser')
+
+        # get all movie genre pages
+        full_mov_lib = soup.find('section', {'data-context': 'slider:genres'})
+        genre_links = full_mov_lib.find_all('a', {'class': 'promo__link'})
+        genre_links = [a['href'] for a in genre_links]
+        genre_links = [i for i in genre_links if 'adult' not in i]
+
+        # for all root genre pages, get extra pagination links to scrape
+        all_extra_pages = []
+        for link in genre_links:
+            r = requests.get(base_url + link)
+            soup = BeautifulSoup(r.text, 'html.parser')
+            extra_pages = soup.find('ul', 'pagination__list')
+            if extra_pages:
+                extra_pages = extra_pages.find_all('a')
+                extra_pages = [a['href'] for a in extra_pages]
+                all_extra_pages.extend(extra_pages)
+        genre_links.extend(all_extra_pages)
+
+        # for all root and extra genre pages, get movie titles
+        catalog = []
+        for link in genre_links:
+            r = requests.get(base_url + link)
+            logging.info('did get on page: {}'.format(link))
+            soup = BeautifulSoup(r.text, 'html.parser')
+
+            anchors = soup.find_all('a', {'class': 'movies-gallery__item'})
+            for a in anchors:
+                title = a['data-label']
+                title = title[title.find(':')+1:]
+                catalog += [{'title': title, 'link': base_url + a['href']}]
+        logging.info('will now check avail on {} catalog items'.format(
+                     len(catalog)))
+
+        # check availability via link, build medias list
+        medias = []
+        for i, c in enumerate(catalog):
+            sleep(0.100)
+            r = requests.get(c['link'])
+            soup = BeautifulSoup(r.text, 'html.parser')
+
+            year = soup.find_all('dd')[-1].text
+            if year and re.search('^\d{4}$', year):
+                c['year'] = year
+            if soup.find(text='STREAM THIS MOVIE'):
+                medias += [c]
+            if i % 100 == 0:
+                logging.info(u'checked availability on {} items'.format(i))
+
+        self.lookup_and_write_medias(medias, mtype='movie', source=source)
+
+        # SHOW SEARCH SECTION
+        logging.info('SHOWTIME SHOW SEARCH')
+        r = requests.get(base_url + '/series')
+        soup = BeautifulSoup(r.text, 'html.parser')
+        all_series = soup.find('section',
+                               {'data-context': 'promo group:All Showtime Series'})
+
+        # get all show titles
+        medias = []
+        anchors = all_series.find_all('a', {'class': 'promo__link'})
+        for a in anchors:
+            title = a.text.strip()
+            link = base_url + a['href']
+            medias += [{'title': title, 'link': link}]
+
+        self.lookup_and_write_medias(medias, mtype='show', source=source)
+
+        # remove any sources not just updated: media this provider no longer has
+        flaskapp.remove_old_sources('showtime')
 
     def search_hbo(self):
         """Searches hbo for media"""
@@ -97,6 +180,115 @@ class ProviderSearch():
 
             self.lookup_and_write_medias(medias, mtype=page['mtype'], source=source)
         self.stop_driver()
+
+    def search_netflix(self):
+        """Searches netflix for media"""
+
+        def get_medias_from_genre_pages(genre_pages):
+            medias = []
+            for page in genre_pages:
+                sleep(1.5)
+                self.driver.get(page + '?so=su')
+                logging.info('did get on page: {}'.format(page))
+                for i in range(40):  # scroll to bottom many times
+                    self.driver.execute_script(
+                        "window.scrollTo(0, document.body.scrollHeight);")
+                    sleep(randint(1,2))
+
+                # put source into beautifulsoup and get titles
+                # soup = BeautifulSoup(driver.page_source, 'html.parser')
+                # divs = soup('div', 'ptrack-content')
+                divs = self.driver.find_elements_by_xpath("//div[@class='ptrack-content']")
+                for d in divs:
+                    # title = d.find('div', 'video-preload-title-label').text
+                    title = d.find_element_by_xpath("//div[@class='video-preload-title-label']").text
+                    elements = d['data-ui-tracking-context'].split(',')
+                    vid_element = [i for i in elements if 'video_id' in i]
+                    netflix_id = vid_element[0][vid_element[0].find(':')+1:]
+                    link = base_url+'/title/'+netflix_id
+                    medias += [{'title': title, 'link': link}]
+                logging.info('len(medias) so far: {}'.format(len(medias)))
+            return medias
+
+        def get_netflix_year(medias):
+            # netflix show year is recent not first air year, cant use in tmdb search
+            medias = [dict(t) for t in set([tuple(d.items()) for d in medias])]
+            logging.info('unique medias in get_netflix_year(): {}'.format(len(medias)))
+            self.start_driver()
+
+            count = 0
+            for i, media in enumerate(medias):
+                if count >= 190:
+                    logging.error('Exiting get_netflix_year early via counter')
+                    break
+                if 'link' in media.keys() and not flaskapp.db_lookup_via_link(media['link']):
+                    sleep(randint(20,30))
+                    try:  # only for new media not in database
+                        count += 1
+                        self.driver.get(media['link'])
+                        year = self.driver.find_element_by_xpath("//span[@class='year']").text
+                        media['year'] = year
+                        logging.info('Media #{}, YEAR LOOKUP #{}: {}'.format(i, count, media))
+                    except:
+                        pass
+            return medias
+
+
+        logging.info('starting netflix search')
+        self.start_driver()
+        base_url = 'http://www.netflix.com'
+        source = {'name': 'netflix', 'display_name': 'Netflix', 'link': base_url}
+
+        # log in to provider
+        self.driver.get('https://www.netflix.com/login')
+        inputs = self.driver.find_elements_by_tag_name('input')
+        inputs[0].send_keys(self.creds['nf_u'])
+        inputs[1].send_keys(self.creds['nf_p'])
+        self.driver.find_element_by_tag_name('button').click()
+        logging.info('netflix, logged in')
+
+        # SHOW SEARCH SECTION
+        logging.info('NETFLIX SHOW SEARCH')
+        genre_pages = [
+                       'https://www.netflix.com/browse/genre/83',  # tv popular
+                       'https://www.netflix.com/browse/genre/10673',  # action
+                       'https://www.netflix.com/browse/genre/10375',  # com
+                       'https://www.netflix.com/browse/genre/11714',  # drama
+                       'https://www.netflix.com/browse/genre/83059',  # horror
+                       'https://www.netflix.com/browse/genre/4366',  # mystery
+                       'https://www.netflix.com/browse/genre/52780',  # sci
+                       'https://www.netflix.com/browse/genre/4814',  # miniseries
+                       'https://www.netflix.com/browse/genre/46553'  # classic
+                      ]
+        medias = get_medias_from_genre_pages(genre_pages)
+        self.lookup_and_write_medias(medias, mtype='show', source=source)
+
+        # MOVIE SEARCH SECTION
+        logging.info('NETFLIX MOVIE SEARCH')
+        genre_pages = [
+                       'https://www.netflix.com/browse/genre/5977',  # gay
+                       'https://www.netflix.com/browse/genre/1365',  # action
+                       'https://www.netflix.com/browse/genre/5763',  # drama
+                       'https://www.netflix.com/browse/genre/7077',  # indie
+                       'https://www.netflix.com/browse/genre/8711',  # horror
+                       'https://www.netflix.com/browse/genre/6548',  # comedy
+                       'https://www.netflix.com/browse/genre/31574',  # classics
+                       'https://www.netflix.com/browse/genre/7424',  # anime
+                       'https://www.netflix.com/browse/genre/783',  # kid
+                       'https://www.netflix.com/browse/genre/7627',  # cult
+                       'https://www.netflix.com/browse/genre/6839',  # docs ~1321
+                       'https://www.netflix.com/browse/genre/78367',  # internat'l
+                       'https://www.netflix.com/browse/genre/8883',  # romance
+                       'https://www.netflix.com/browse/genre/1492',  # scifi
+                       'https://www.netflix.com/browse/genre/8933'  # thrillers
+                      ]
+        medias = get_medias_from_genre_pages(genre_pages)
+        self.stop_driver()  # get_netflix_year() will start a new driver
+        medias = get_netflix_year(medias)
+        self.lookup_and_write_medias(medias, mtype='movie', source=source)
+
+        # remove any sources not just updated: media this provider no longer has
+        flaskapp.remove_old_sources('netflix')
 
     def search_hulu(self):
         """Searches hulu for media"""
@@ -203,6 +395,15 @@ class ProviderSearch():
         self.stop_driver()
         flaskapp.remove_old_sources('hulu')  # remove sources not just updated
 
+    def update_watchlist_amz():
+        """for watchlist items check if amz is a source and add to db"""
+        wl_unique = flaskapp.get_all_watchlist_in_db()
+        for m in wl_unique:
+            media = flaskapp.themoviedb_lookup(m['mtype'], m['id'])
+            flaskapp.amz_prime_check(media)
+            sleep(2.5)
+            flaskapp.amz_pay_check(media)
+            sleep(2.5)
 
     def lookup_and_write_medias(self, medias, mtype, source):
         # get unique: list of dict into list of tuples, set, back to dict
@@ -268,6 +469,37 @@ class ProviderSearch():
             flaskapp.update_media_with_source(full_media, source_to_write)
 
 
-PS = ProviderSearch()
-#PS.search_hbo()
-PS.search_hulu()
+run = ProviderSearch()
+
+# run.search_netflix()
+#run.search_hulu()
+run.search_showtime()
+#run.search_hbo()
+# run.update_watchlist_amz()
+#flaskapp.remove_hulu_addon_media()
+#flaskapp.reindex_database()
+
+
+'''
+=amz searches and issues with multiple approaches:=
+"Clear and Present Danger 1994" = no result, amz moviepage year=null |
+     "Gang ~NY 2002" none amz has 2003 (yr diff)
+"Benjamin Button" the result has year=2009, but amz moviepage year=2008
+    (as does tmdb), amz only gives rel date that changes
+"Snowden" the result has year=2007, diff product than 2016 movie, false pos
+    unless compare year
+"Snowden 2016", no match (good)
+"Deadpool 2016" response is "~Clip: Drawing Deadpool", suggests to compare
+    exact titles
+"Zoolander 2" response is "Zoolander No. 2: The Magnum Edition", suggests
+    to not compare exact titles
+"The Terminator 1984", top result is "Terminator Genisys"
+Title | Keyword director search fixes all above, adds some issues but
+    seem not as big:
+-"Creed | Ryan Coogler" has a documentary about the movie as top result
+    w/ no year, false neg
+-"The Age of Adaline | Lee Toland Krieger" has no results since director
+    not returned by amz, false neg
+-misspelled dir names, fasle negs: "Contract Killer" jet lei, "Terminator
+    Genisys", "Maya the Bee Movie"
+'''
