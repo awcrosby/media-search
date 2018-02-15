@@ -247,6 +247,8 @@ def themoviedb_search(query, mtype, year=''):
             query = query[:-6].strip() 
 
     # lookup media dict from themoviedb
+    if 'U.S.' in query:
+        query = query.replace('U.S.', 'US')
     params['query'] = query
     search_type = 'movie' if mtype == 'movie' else 'tv'
     return requests.get(tmdb_url+search_type, params=params).json()
