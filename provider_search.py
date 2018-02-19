@@ -98,7 +98,7 @@ class ProviderSearch():
         # check availability via link, build medias list
         medias = []
         for i, c in enumerate(catalog):
-            sleep(0.100)
+            sleep(0.25)
             r = requests.get(c['link'])
             soup = BeautifulSoup(r.text, 'html.parser')
 
@@ -391,7 +391,7 @@ class ProviderSearch():
         self.stop_driver()
         flaskapp.remove_old_sources('hulu')  # remove sources not just updated
 
-    def update_watchlist_amz():
+    def update_watchlist_amz(self):
         """for watchlist items check if amz is a source and add to db"""
         wl_unique = flaskapp.get_all_watchlist_in_db()
         for m in wl_unique:

@@ -2,19 +2,16 @@
 {% set active_page = 'about' %}
 
 {% block body %}
-    <div><h4>
-        This project searches movies and tv shows, then displays streaming sources if found. User registration allows for creation of a personalized watchlist with sources displayed. System pieces include:
-    </h4></div>
-    <div>
-      <ul>
-        <li><strong>Linux, Nginx/Gunicorn, MongoDB, Python/Flask</strong>
-        <li>Webserver + framework: Nginx/Gunicorn, Python/Flask
-        <li>Database: MongoDB
-        <li>HTML Templating: jinja, VueJS
-        <li>UI: Bootstrap, some custom CSS
-        <li>DevOps: AWS, Ansible, ufw
-        <li>Other tools: flash messaging, wtforms, logging, REST, APIs
-        <li>Dev Environment: Ubuntu, vim/tmux, github
-      </ul>
-    <div>
+  <table class="table table-dark">
+    <tr>
+      <td>
+        Watchlst.com lets you create a watchlist of movies and tv shows, and tells you sites where they are streaming. You can hide media with no stream sources so you see only what is watchable.
+        <br><br>
+        All streaming sources are based on US availability.
+      </td>
+      <td>
+        <img src="/static/demo.gif" alt="demo animation of using site">
+      </td>
+    </tr>
+  </table>
 {% endblock %}
