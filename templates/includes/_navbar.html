@@ -8,6 +8,9 @@
           <li {% if active_page == 'home' %} class="active"{% endif %}>
             <a href="/">Home</a>
           </li>
+          <li {% if active_page == 'about' %} class="active"{% endif %}>
+            <a href="/about">About</a>
+          </li>
         {% if session.logged_in %}
           <li {% if active_page == 'watchlist' %} class="active"{% endif %}>
             <a href="/watchlist">My Watchlist</a>

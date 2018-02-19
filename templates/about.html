@@ -2,16 +2,14 @@
 {% set active_page = 'about' %}
 
 {% block body %}
-  <table class="table table-dark">
-    <tr>
-      <td>
-        Watchlst.com lets you create a watchlist of movies and tv shows, and tells you sites where they are streaming. You can hide media with no stream sources so you see only what is watchable.
-        <br><br>
-        All streaming sources are based on US availability.
-      </td>
-      <td>
-        <img src="/static/demo.gif" alt="demo animation of using site">
-      </td>
-    </tr>
-  </table>
+  <div class="row">
+    <div class="col-md-6">
+      <h3>Create a watchlist of movies and tv shows and see the sites where they are streaming. You can hide media with no stream sources so you see only what is watchable.</h3>
+      <p>All streaming sources are based on US availability.</p>
+    </div>
+
+    <div class="col-md-6">
+      <img src="/static/demo.gif" style="border: 1px solid #021a40" alt="demo animation of using site">
+    </div>
+  </div>
 {% endblock %}

@@ -80,7 +80,6 @@ def home():
 
 # about page
 @app.route('/about')
-@is_logged_in
 def about():
     return render_template('about.html')
 
