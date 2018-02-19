@@ -1,6 +1,6 @@
 server {
     listen 80;
-    server_name media.awctech.com;
+    server_name watchlst.com;
 
     location / {
         include proxy_params;

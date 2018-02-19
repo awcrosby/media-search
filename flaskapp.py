@@ -244,7 +244,7 @@ def themoviedb_search(query, mtype, year=''):
             params['first_air_date_year'] = year
         if re.search('\([0-9][0-9][0-9][0-9]\)$', query):
             params['first_air_date_year'] = query[-5:-1]
-            query = query[:-6].strip() 
+            query = query[:-6].strip()
 
     # lookup media dict from themoviedb
     if 'U.S.' in query:
@@ -271,8 +271,8 @@ def mediainfo(mtype='', mid=None):
         return redirect(url_for('home'))
 
     # check if this title/year avail on amz, if so write to db
-    #amz_prime_check(api_media)
-    #amz_pay_check(api_media)
+    amz_prime_check(api_media)
+    amz_pay_check(api_media)
 
     # get media from db to check for sources
     db_media = get_media_from_db(mtype, mid)
@@ -286,7 +286,7 @@ def mediainfo(mtype='', mid=None):
             db_media.pop('year', '')  # if empty then delete
         media.update(db_media)
 
-    # sort and get json version of sources for javascript to use 
+    # sort and get json version of sources for javascript to use
     sources = media['sources']
     sources = sorted(sources, key=lambda k: k['name'] == 'amazon_pay')
     sources = json.dumps(sources)
@@ -590,7 +590,7 @@ def get_media_recs():
                                       {'poster_path': {'$nin': [None, '']}}
                                     ]}},
                 {'$sample': {'size': 6}}
-           ])   
+           ])
 
 
 def get_media_from_db(mtype, mid):

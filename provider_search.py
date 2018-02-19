@@ -471,7 +471,7 @@ bot.search_netflix()
 bot.search_hulu()
 bot.search_showtime()
 bot.search_hbo()
-#bot.update_watchlist_amz()
+bot.update_watchlist_amz()
 flaskapp.remove_hulu_addon_media()
 flaskapp.reindex_database()
 

@@ -112,10 +112,10 @@
         minute: 26
         hour: 5
         job: ~/media-search/config/mongo_bkup.sh
-    #- name: Add crontab entry to run provider_search.py
-    #  cron:
-    #    name: provider search
-    #    minute: 0
-    #    hour: 0
-    #    weekday: sun
-    #    job: cd /home/awcrosby/media-search && /home/awcrosby/media-search/venv/bin/python /home/awcrosby/media-search/provider_search.py
+    # - name: Add crontab entry to run provider_search.py
+    #   cron:
+    #     name: provider search
+    #     minute: 0
+    #     hour: 0
+    #     weekday: sun
+    #     job: cd /home/awcrosby/media-search && /home/awcrosby/media-search/venv/bin/python /home/awcrosby/media-search/provider_search.py
