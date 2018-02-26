@@ -27,6 +27,10 @@ footer { text-align: center; margin: 3em; }
 #results article { width: 154px; margin: 0 31px 0 0; padding-top: 6px; }
 #results h5 { margin-bottom: 5px; }
 
+@media screen and (max-width: 625px) {
+  #results article { margin-right: 20px; }
+}
+
 /* http://stackoverflow.com/questions/30930792/how-to-make-divs-that-automatically-wrap-to-the-next-row */
 .source {
     display: inline-block;
