@@ -146,23 +146,31 @@ class ProviderSearch():
         for page in pages:
             logging.info('HBO SEARCH OF ' + page['url'])
             self.driver.get(base_url + page['url'])
-            sleep(5)
-            self.driver.execute_script("window.scrollTo(0, 10000);")  # scroll
-            sleep(15)
-            #self.driver.save_screenshot('screenshot.png')
-
-            # get all boxes with media image and text
-            boxes = self.driver.find_elements_by_xpath("//a[@class='default class2 class4']")
-            logging.info('num of media boxes found: {}'.format(len(boxes)))
-
-            # create list of titles and links, replacing newline
             medias = []
-            for i, b in enumerate(boxes):
-                title = b.text.replace('\n', ' ')
-                medias += [{'title': title, 'link': b.get_attribute('href')}]
+            for scroll in range(4):
+                # get all boxes with media image and text
+                sleep(15)
+                boxes = self.driver.find_elements_by_xpath("//a[@class='default class2 class4']")
+                logging.info('boxes found: {}'.format(len(boxes)))
 
-            # remove non-media, TODO make not catch false positives
-            medias = [m for m in medias if not m['title'].isupper()]
+                # create list of titles and links, replacing newline
+                for i, b in enumerate(boxes):
+                    title = b.text.replace('\n', ' ')
+                    medias += [{'title': title, 'link': b.get_attribute('href')}]
+                logging.info('num of medias so far: {}'.format(len(medias)))
+
+                # scroll down to have more boxes visible
+                self.driver.execute_script("window.scrollBy(0, 6000);")
+
+            # get unique medias
+            medias = [dict(t) for t in set([tuple(d.items()) for d in medias])]
+            logging.info('post-unique, num of medias: {}'.format(len(medias)))
+
+            # self.driver.save_screenshot('static/screenshot.png')  ## if mem
+
+            # remove non-media
+            medias = [m for m in medias if 'feature' in m['link']]
+            logging.info('post-cleanup, num medias: {}'.format(len(medias)))
 
             # get year if not already in database
             logging.info('getting year for all movies not in database')
