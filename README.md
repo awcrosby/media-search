@@ -27,8 +27,8 @@ Linux, Nginx/Gunicorn, MongoDB, Python/Flask
 ### Additional Details
 * Webserver + framework: Nginx/Gunicorn, Python/Flask
 * Database: MongoDB
-* HTML Templating: jinja, VueJS
-* UI: Bootstrap, some custom CSS
 * DevOps: AWS, Ansible, ufw, fail2ban
-* Other tools: flash messaging, wtforms, logging, REST API
+* Other tools: flash messaging, wtforms, jinja, logging, REST API
 * Dev Environment: Ubuntu, vim/tmux, github
+* JavaScript framework: VueJS
+* UI Presentation: Bootstrap, some custom CSS
