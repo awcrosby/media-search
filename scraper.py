@@ -1,13 +1,35 @@
 #!/bin/python
 # -*- coding: utf-8 -*-
 
-"""
-Class to search providers of streaming media
+"""This module searches providers of streaming media
 
-install google chrome in ubuntu: https://askubuntu.com/questions/510056/how-to-install-google-chrome
-chromedriver docs for quickstart: https://sites.google.com/a/chromium.org/chromedriver/getting-started
-set options for headless: https://stackoverflow.com/questions/46920243/
-start display before chrome: https://stackoverflow.com/questions/22424737/
+Chrome Driver Setup Notes:
+    install google chrome in ubuntu: https://askubuntu.com/questions/510056/how-to-install-google-chrome
+    chromedriver docs for quickstart: https://sites.google.com/a/chromium.org/chromedriver/getting-started
+    set options for headless: https://stackoverflow.com/questions/46920243/
+    start display before chrome: https://stackoverflow.com/questions/22424737/
+
+Amazon searches and issues with multiple approaches:
+    "Clear and Present Danger 1994" = no result, amz moviepage year=null |
+         "Gang ~NY 2002" none amz has 2003 (yr diff)
+    "Benjamin Button" the result has year=2009, but amz moviepage year=2008
+        (as does tmdb), amz only gives rel date that changes
+    "Snowden" the result has year=2007, diff product than 2016 movie, false pos
+        unless compare year
+    "Snowden 2016", no match (good)
+    "Deadpool 2016" response is "~Clip: Drawing Deadpool", suggests to compare
+        exact titles
+    "Zoolander 2" response is "Zoolander No. 2: The Magnum Edition", suggests
+        to not compare exact titles
+    "The Terminator 1984", top result is "Terminator Genisys"
+    Title | Keyword director search fixes all above, adds some issues but
+        seem not as big:
+    -"Creed | Ryan Coogler" has a documentary about the movie as top result
+        w/ no year, false neg
+    -"The Age of Adaline | Lee Toland Krieger" has no results since director
+        not returned by amz, false neg
+    -misspelled dir names, fasle negs: "Contract Killer" jet lei, "Terminator
+        Genisys", "Maya the Bee Movie"
 """
 
 from time import sleep
@@ -25,7 +47,7 @@ from bs4 import BeautifulSoup
 
 CHROMEDRIVER_PATH = '/var/chromedriver/chromedriver'
 
-class ProviderSearch():
+class Scraper():
     def __init__(self):
         with open('creds.json', 'r') as f:
             self.creds = json.loads(f.read())
@@ -50,53 +72,118 @@ class ProviderSearch():
         self.display.stop()
         self.driver.quit()
 
-    def search_showtime(self):
-        """Searches showtime for media, uses lighter requests/bs4 not chrome"""
-        logging.info('starting showtime search')
+    def lookup_and_write_medias(self, medias, mtype):
+        # get unique: list of dict into list of tuples, set, back to dict
+        logging.info('len(medias) before take unique: {}'.format(len(medias)))
+        medias = [dict(t) for t in set([tuple(d.items()) for d in medias])]
+        logging.info('len(medias) after take unique: {}'.format(len(medias)))
 
-        base_url = 'http://www.sho.com'
-        source = {'name': 'showtime', 'display_name': 'Showtime', 'link': base_url}
+        for m in medias:
+            source_to_write = dict(self.source)
 
-        # MOVIE SEARCH SECTION
-        logging.info('SHOWTIME MOVIE SEARCH')
-        r = requests.get(base_url + '/movies')
+            # if media link exists, set source link, try link db lookup / update
+            if 'link' in m.keys():
+                source_to_write['link'] = m['link']
+                full_media = flaskapp.db_lookup_via_link(m['link'])
+                if full_media:
+                    # logging.info(u'db media link found: {}'.format(m['title']))
+                    flaskapp.update_media_with_source(full_media, source_to_write)
+                    continue
+
+            # link url was not in database, therefore do themoviedb search
+            sleep(0.2)
+            year = m.get('year', '')
+
+            results = flaskapp.themoviedb_search(m['title'], mtype, year=year)
+
+            # exit iteration if search not complete or no results
+            if 'total_results' not in results:
+                logging.error(u'tmdb search not complete for {}: {} {}'.format(
+                              mtype, m['title'], year))
+                continue
+            if results['total_results'] < 1:
+                logging.warning(u'tmdb 0 results for {}: {} {}'.format(
+                                mtype, m['title'], year))
+                # empty media for db write, prevent re-searching
+                full_media = dict()
+                full_media['title'] = m['title']
+                full_media['mtype'] = mtype
+                full_media['year'] = year
+                full_media['id'] = m['link']
+                full_media['sources'] = []
+            else:
+                # assume top result is best match and use it
+                full_media = results['results'][0]
+
+                # append data so dict can be saved to database
+                full_media['mtype'] = mtype
+                full_media['sources'] = []
+                if mtype == 'movie':
+                    full_media['year'] = full_media['release_date'][:4]
+                else:
+                    full_media['title'] = full_media['name']
+                    full_media['year'] = full_media['first_air_date'][:4]
+
+                # check if titles are not exact match, in future may not append these
+                if not flaskapp.doTitlesMatch(m['title'], full_media['title']):
+                    logging.warning(u'not exact titles: {} | {}'.format(
+                                    m['title'], full_media['title']))
+
+            # write db media if new
+            flaskapp.insert_media_if_new(full_media)
+
+            # update db media with source
+            flaskapp.update_media_with_source(full_media, source_to_write)
+
+class ShoScraper(Scraper):
+    def __init__(self):
+        self.base_url = 'http://www.sho.com'
+        self.source = {'name': 'showtime',
+                       'display_name': 'Showtime',
+                       'link': self.base_url}
+        self.movie_pages, self.movies, self.shows = [], [] , []
+
+    def get_movie_pages(self):
+        r = requests.get(self.base_url + '/movies')
         soup = BeautifulSoup(r.text, 'html.parser')
 
-        # get all movie genre pages
+        # get first movie page for each genre
         full_mov_lib = soup.find('section', {'data-context': 'slider:genres'})
-        genre_links = full_mov_lib.find_all('a', {'class': 'promo__link'})
-        genre_links = [a['href'] for a in genre_links]
-        genre_links = [i for i in genre_links if 'adult' not in i]
+        movie_pages = full_mov_lib.find_all('a', {'class': 'promo__link'})
+        movie_pages = [a['href'] for a in movie_pages]
+        movie_pages = [i for i in movie_pages if 'adult' not in i]
 
-        # for all root genre pages, get extra pagination links to scrape
+        # for each first movie page genre, add extra pagination
         all_extra_pages = []
-        for link in genre_links:
-            r = requests.get(base_url + link)
+        for page in movie_pages:
+            r = requests.get(self.base_url + page)
             soup = BeautifulSoup(r.text, 'html.parser')
             extra_pages = soup.find('ul', 'pagination__list')
             if extra_pages:
                 extra_pages = extra_pages.find_all('a')
                 extra_pages = [a['href'] for a in extra_pages]
                 all_extra_pages.extend(extra_pages)
-        genre_links.extend(all_extra_pages)
+        movie_pages.extend(all_extra_pages)
+        self.movie_pages = movie_pages
 
-        # for all root and extra genre pages, get movie titles
+    def get_movies(self, limit=None):
+        # get catalog which includes movies not streamable
         catalog = []
-        for link in genre_links:
-            r = requests.get(base_url + link)
-            logging.info('did get on page: {}'.format(link))
+        for page in self.movie_pages:
+            r = requests.get(self.base_url + page)
+            logging.info('did get on page: {}'.format(page))
             soup = BeautifulSoup(r.text, 'html.parser')
 
             anchors = soup.find_all('a', {'class': 'movies-gallery__item'})
             for a in anchors:
                 title = a['data-label']
                 title = title[title.find(':')+1:]
-                catalog += [{'title': title, 'link': base_url + a['href']}]
+                catalog += [{'title': title, 'link': self.base_url + a['href']}]
         logging.info('will now check avail on {} catalog items'.format(
                      len(catalog)))
 
-        # check availability via link, build medias list
-        medias = []
+        # check catalog for streamable movies, clear and build movies list
+        self.movies = []
         for i, c in enumerate(catalog):
             sleep(0.25)
             r = requests.get(c['link'])
@@ -106,32 +193,111 @@ class ProviderSearch():
             if year and re.search('^\d{4}$', year):
                 c['year'] = year
             if soup.find(text='STREAM THIS MOVIE'):
-                medias += [c]
+                self.movies += [c]
             if i % 100 == 0:
                 logging.info(u'checked availability on {} items'.format(i))
+            if limit and (i >= limit-1):  # used for unit testing
+                break
 
-        self.lookup_and_write_medias(medias, mtype='movie', source=source)
-
-        # SHOW SEARCH SECTION
-        logging.info('SHOWTIME SHOW SEARCH')
-        r = requests.get(base_url + '/series')
+    def get_shows(self):
+        r = requests.get(self.base_url + '/series')
         soup = BeautifulSoup(r.text, 'html.parser')
         all_series = soup.find('section',
-                               {'data-context': 'promo group:All Showtime Series'})
+                         {'data-context': 'promo group:All Showtime Series'})
 
-        # get all show titles
-        medias = []
+        self.shows = []
         anchors = all_series.find_all('a', {'class': 'promo__link'})
         for a in anchors:
             title = a.text.strip()
-            link = base_url + a['href']
-            medias += [{'title': title, 'link': link}]
+            link = self.base_url + a['href']
+            self.shows += [{'title': title, 'link': link}]
 
-        self.lookup_and_write_medias(medias, mtype='show', source=source)
+    def scrape_and_write_medias(self):
+        """Searches showtime for media, uses lighter requests/bs4 not chrome"""
+        logging.info('SHOWTIME MOVIE SEARCH')
+        self.get_movie_pages()
+        self.get_movies()
+        self.lookup_and_write_medias(medias=self.movies, mtype='movie')
+
+        logging.info('SHOWTIME SHOW SEARCH')
+        self.get_shows()
+        self.lookup_and_write_medias(medias=self.shows, mtype='show')
 
         # remove any sources not just updated: media this provider no longer has
         flaskapp.remove_old_sources('showtime')
 
+
+class HboScraper(Scraper):
+    def __init__(self):
+        self.base_url = 'https://play.hbogo.com'
+        self.source = {'name': 'hbo',
+                       'display_name': 'HBO',
+                       'link': self.base_url}
+
+    def get_medias_from_page(self, page, mtype, limit=None):
+        medias = []
+        logging.info('getting page: {}'.format(page))
+        self.driver.get(self.base_url + page)
+        for scroll in range(4):
+            # get all boxes with media image and text
+            sleep(10)
+            boxes = self.driver.find_elements_by_xpath("//a[@class='default class2 class4']")
+            logging.info('boxes found: {}'.format(len(boxes)))
+
+            # create list of titles and links, replacing newline
+            for i, box in enumerate(boxes):
+                title = box.text.replace('\n', ' ')
+                medias += [{'title': title, 'link': box.get_attribute('href')}]
+            logging.info('num of medias so far: {}'.format(len(medias)))
+
+            # scroll down to have more boxes visible
+            self.driver.execute_script("window.scrollBy(0, 6000);")
+            if limit:  # exits quickly for unit test
+                break
+
+        # get unique medias
+        medias = [dict(t) for t in set([tuple(d.items()) for d in medias])]
+        logging.info('post-unique, num of medias: {}'.format(len(medias)))
+
+        # self.driver.save_screenshot('static/screenshot.png')  ## if memory
+
+        # remove non-media
+        medias = [m for m in medias if 'scrollReset' not in m['link']]
+        logging.info('post-cleanup, num medias: {}'.format(len(medias)))
+        return medias
+
+    def add_years_to_movies(self, movies):
+        logging.info('getting year for movies if not in database')
+        for m in movies:
+            if not flaskapp.db_lookup_via_link(m['link']):
+                self.driver.get(m['link'])
+                sleep(randint(5,10))
+                texts = self.driver.find_element_by_tag_name("body").text
+                texts = texts.split('\n')
+
+                years = [t for t in texts if re.search('^\d{4}.+min$', t)]
+                if len(years) > 0:
+                    m['year'] = years[0][:4]
+                logging.info('year lookup: {}: {}'.format(m['title'], m.get('year', '')))
+        return movies
+
+    def scrape_and_write_medias(self):
+        self.start_driver(window_size='--window-size=1920,6000')
+
+        logging.info('HBO MOVIE SEARCH')
+        movies = self.get_medias_from_page('/movies', mtype='movie')
+        movies = self.add_years_to_movies(movies)
+        self.lookup_and_write_medias(medias=movies, mtype='movie')
+
+        logging.info('HBO SHOW SEARCH')
+        shows = self.get_medias_from_page('/series', mtype='show')
+        self.lookup_and_write_medias(medias=shows, mtype='show')
+
+        self.stop_driver()
+        # remove any sources not just updated: media this provider no longer has
+        flaskapp.remove_old_sources('hbo')
+
+class ProviderSearch():
     def search_hbo(self):
         """Searches hbo for media"""
         logging.info('starting hbo search')
@@ -204,6 +370,7 @@ class ProviderSearch():
                     sleep(randint(1,2))
 
                 divs = self.driver.find_elements_by_xpath("//div[contains(@class, 'ptrack-content')]")
+                #import pdb; pdb.set_trace()
                 for d in divs:
                     title = d.find_element_by_css_selector('div.video-preload-title-label').text
                     elements = d.get_attribute('data-ui-tracking-context').split(',')
@@ -473,37 +640,21 @@ class ProviderSearch():
             flaskapp.update_media_with_source(full_media, source_to_write)
 
 
-bot = ProviderSearch()
+def main():
+    #bot = ShoScraper()
+    #bot.scrape_and_write_medias()
 
-bot.search_netflix()
-bot.search_hulu()
-bot.search_showtime()
-bot.search_hbo()
-bot.update_watchlist_amz()
-flaskapp.remove_hulu_addon_media()
-flaskapp.reindex_database()
+    bot = HboScraper()
+    bot.scrape_and_write_medias()
+
+    #bot.search_netflix()
+    #bot.search_hulu()
+    #bot.search_showtime()
+    #bot.search_hbo()
+    #bot.update_watchlist_amz()
+    #flaskapp.remove_hulu_addon_media()
+    #flaskapp.reindex_database()
 
 
-'''
-=amz searches and issues with multiple approaches:=
-"Clear and Present Danger 1994" = no result, amz moviepage year=null |
-     "Gang ~NY 2002" none amz has 2003 (yr diff)
-"Benjamin Button" the result has year=2009, but amz moviepage year=2008
-    (as does tmdb), amz only gives rel date that changes
-"Snowden" the result has year=2007, diff product than 2016 movie, false pos
-    unless compare year
-"Snowden 2016", no match (good)
-"Deadpool 2016" response is "~Clip: Drawing Deadpool", suggests to compare
-    exact titles
-"Zoolander 2" response is "Zoolander No. 2: The Magnum Edition", suggests
-    to not compare exact titles
-"The Terminator 1984", top result is "Terminator Genisys"
-Title | Keyword director search fixes all above, adds some issues but
-    seem not as big:
--"Creed | Ryan Coogler" has a documentary about the movie as top result
-    w/ no year, false neg
--"The Age of Adaline | Lee Toland Krieger" has no results since director
-    not returned by amz, false neg
--misspelled dir names, fasle negs: "Contract Killer" jet lei, "Terminator
-    Genisys", "Maya the Bee Movie"
-'''
+if __name__ == "__main__":
+    main()
