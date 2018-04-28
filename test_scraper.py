@@ -17,6 +17,7 @@ class ScraperTestCase(unittest.TestCase):
 
     def Xtest_showtime_scrape(self):
         sho = ShoScraper()
+
         sho.get_movie_pages()
         self.assertTrue(len(sho.movie_pages) > 15)
         sho.get_movies(limit=10)
@@ -28,18 +29,10 @@ class ScraperTestCase(unittest.TestCase):
         hbo = HboScraper()
         hbo.start_driver(window_size='--window-size=1920,6000')
 
-        movies = hbo.get_medias_from_page('/movies', mtype='movie', limit=1)
-        self.assertTrue(len(movies) > 200)
-
-        #TODO see why shows post-cleanup step goes from 106 to 0
-        # test adding year class method
-        # run unit tests on prod box to see if any driver issues
-        # test removing old sources
-        # del all hbo media so will search for years (overall test)
-
-        #shows = hbo.get_medias_from_page('/series', mtype='show', limit=1)
-        #self.assertTrue(len(shows) > 20)
-        #print('num shows', len(shows))
+        movies = hbo.get_medias_from_page('/movies', mtype='movie', limit=True)
+        self.assertTrue(len(movies) > 50)
+        shows = hbo.get_medias_from_page('/series', mtype='show', limit=True)
+        self.assertTrue(len(shows) > 50)
 
         hbo.stop_driver()
 

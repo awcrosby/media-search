@@ -236,6 +236,7 @@ class HboScraper(Scraper):
 
     def get_medias_from_page(self, page, mtype, limit=None):
         medias = []
+        logging.info('getting page: {}'.format(page))
         self.driver.get(self.base_url + page)
         for scroll in range(4):
             # get all boxes with media image and text
@@ -261,12 +262,12 @@ class HboScraper(Scraper):
         # self.driver.save_screenshot('static/screenshot.png')  ## if memory
 
         # remove non-media
-        medias = [m for m in medias if 'feature' in m['link']]
+        medias = [m for m in medias if 'scrollReset' not in m['link']]
         logging.info('post-cleanup, num medias: {}'.format(len(medias)))
         return medias
 
     def add_years_to_movies(self, movies):
-        logging.info('getting year for movies not in database')
+        logging.info('getting year for movies if not in database')
         for m in movies:
             if not flaskapp.db_lookup_via_link(m['link']):
                 self.driver.get(m['link'])
@@ -285,8 +286,7 @@ class HboScraper(Scraper):
 
         logging.info('HBO MOVIE SEARCH')
         movies = self.get_medias_from_page('/movies', mtype='movie')
-        #movies += self.get_medias_from_page('/documentaries', mtype='movie')
-        movies = add_years_to_movies(movies)
+        movies = self.add_years_to_movies(movies)
         self.lookup_and_write_medias(medias=movies, mtype='movie')
 
         logging.info('HBO SHOW SEARCH')
@@ -295,7 +295,7 @@ class HboScraper(Scraper):
 
         self.stop_driver()
         # remove any sources not just updated: media this provider no longer has
-        #check if needed.... flaskapp.remove_old_sources('hbo')
+        flaskapp.remove_old_sources('hbo')
 
 class ProviderSearch():
     def search_hbo(self):
