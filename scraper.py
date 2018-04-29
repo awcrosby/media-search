@@ -63,7 +63,7 @@ class Scraper():
         options.add_argument('--headless')
         options.add_argument('--disable-gpu')  # likely necessary
         options.add_argument(window_size)
-        self.driver = webdriver.Chrome(CHROMEDRIVER_PATH, chrome_options=options)
+        self.driver = webdriver.Chrome(CHROMEDRIVER_PATH, options=options)
         self.driver.implicitly_wait(10)  # seconds
 
     def stop_driver(self):
@@ -238,7 +238,8 @@ class HboScraper(Scraper):
         medias = []
         logging.info('getting page: {}'.format(page))
         self.driver.get(self.base_url + page)
-        for scroll in range(4):
+        scrolls = 4 if mtype == 'movie' else 1
+        for scroll in range(scrolls):
             # get all boxes with media image and text
             sleep(10)
             boxes = self.driver.find_elements_by_xpath("//a[@class='default class2 class4']")
@@ -297,64 +298,138 @@ class HboScraper(Scraper):
         # remove any sources not just updated: media this provider no longer has
         flaskapp.remove_old_sources('hbo')
 
-class ProviderSearch():
-    def search_hbo(self):
-        """Searches hbo for media"""
-        logging.info('starting hbo search')
-        self.start_driver(window_size='--window-size=1920,6000')
 
-        base_url = 'https://play.hbogo.com'
-        source = {'name': 'hbo', 'display_name': 'HBO', 'link': base_url}
-        pages = [{'url': '/movies', 'mtype': 'movie'},
-                 {'url': '/series', 'mtype': 'show'},
-                 {'url': '/documentaries', 'mtype': 'movie'}]
+class NetflixScraper(Scraper):
+    def __init__(self):
+        super( NetflixScraper, self ).__init__()
+        self.base_url = 'http://www.netflix.com'
+        self.source = {'name': 'netflix',
+                       'display_name': 'Netflix',
+                       'link': self.base_url}
+        
+        self.movie_genre_pages = [
+            'https://www.netflix.com/browse/genre/5977',  # gay
+            'https://www.netflix.com/browse/genre/1365',  # action
+            'https://www.netflix.com/browse/genre/5763',  # drama
+            'https://www.netflix.com/browse/genre/7077',  # indie
+            'https://www.netflix.com/browse/genre/8711',  # horror
+            'https://www.netflix.com/browse/genre/6548',  # comedy
+            'https://www.netflix.com/browse/genre/31574',  # classics
+            'https://www.netflix.com/browse/genre/7424',  # anime
+            'https://www.netflix.com/browse/genre/783',  # kid
+            'https://www.netflix.com/browse/genre/7627',  # cult
+            'https://www.netflix.com/browse/genre/6839',  # docs ~1321
+            'https://www.netflix.com/browse/genre/78367',  # internat'l
+            'https://www.netflix.com/browse/genre/8883',  # romance
+            'https://www.netflix.com/browse/genre/1492',  # scifi
+            'https://www.netflix.com/browse/genre/8933'  # thrillers
+        ]
 
-        for page in pages:
-            logging.info('HBO SEARCH OF ' + page['url'])
-            self.driver.get(base_url + page['url'])
+        self.show_genre_pages = [
+            'https://www.netflix.com/browse/genre/83',  # tv popular
+            'https://www.netflix.com/browse/genre/10673',  # action
+            'https://www.netflix.com/browse/genre/10375',  # com
+            'https://www.netflix.com/browse/genre/11714',  # drama
+            'https://www.netflix.com/browse/genre/83059',  # horror
+            'https://www.netflix.com/browse/genre/4366',  # mystery
+            'https://www.netflix.com/browse/genre/52780',  # sci
+            'https://www.netflix.com/browse/genre/4814',  # miniseries
+            'https://www.netflix.com/browse/genre/46553',  # classic
+        ]
+
+    def login(self):
+        self.driver.get(self.base_url + '/login')
+        inputs = self.driver.find_elements_by_tag_name('input')
+        inputs[0].send_keys(self.creds['nf_u'])
+        inputs[1].send_keys(self.creds['nf_p'])
+        self.driver.find_element_by_tag_name('button').click()
+
+        if self.driver.current_url == 'https://www.netflix.com/browse':
+            return True
+        return False
+
+    def get_medias(self, mtype, limit=None):
+            if mtype == 'movie':
+                genre_pages = self.movie_genre_pages
+            elif mtype == 'show':
+                genre_pages = self.show_genre_pages
+
             medias = []
-            for scroll in range(4):
-                # get all boxes with media image and text
-                sleep(15)
-                boxes = self.driver.find_elements_by_xpath("//a[@class='default class2 class4']")
-                logging.info('boxes found: {}'.format(len(boxes)))
+            for page in genre_pages:
+                sleep(1.5)
+                self.driver.get(page + '?so=su')
+                logging.info('did get on page: {}'.format(page))
+                for i in range(40):  # scroll to bottom many times
+                    self.driver.execute_script(
+                        "window.scrollTo(0, document.body.scrollHeight);")
+                    sleep(randint(1,2))
+                    if limit:  # exit early for unit test
+                        break
 
-                # create list of titles and links, replacing newline
-                for i, b in enumerate(boxes):
-                    title = b.text.replace('\n', ' ')
-                    medias += [{'title': title, 'link': b.get_attribute('href')}]
-                logging.info('num of medias so far: {}'.format(len(medias)))
+                divs = self.driver.find_elements_by_xpath("//div[contains(@class, 'ptrack-content')]")
+                #import pdb; pdb.set_trace()
+                for d in divs:
+                    try:
+                        title = d.find_element_by_css_selector('div.video-preload-title-label').text
+                        elements = d.get_attribute('data-ui-tracking-context').split(',')
+                        vid_element = [i for i in elements if 'video_id' in i]
+                        netflix_id = vid_element[0][vid_element[0].find(':')+1:]
+                        link = self.base_url + '/title/' + netflix_id
+                        medias += [{'title': title, 'link': link}]
+                    except NoSuchElementException:
+                        logging.warning('no title found in netflix {}'.format(mtype))
+                logging.info('len(medias) so far: {}'.format(len(medias)))
+                if limit:  # exit early for unit test
+                    break
+            return medias
+        
+    def add_years_to_movies(self, movies):
+        # netflix show year is recent not first air year, cant use in tmdb search
+        logging.info('getting year for movies if not in database')
+        movies = [dict(t) for t in set([tuple(d.items()) for d in movies])]
+        logging.info('unique movies count: {}'.format(len(movies)))
 
-                # scroll down to have more boxes visible
-                self.driver.execute_script("window.scrollBy(0, 6000);")
+        count = 0
+        for i, movie in enumerate(movies):
+            if 'link' in movie.keys() and not flaskapp.db_lookup_via_link(movie['link']):
+                sleep(randint(10,15))
+                try:
+                    count += 1
+                    self.driver.get(movie['link'])
+                    year = self.driver.find_element_by_xpath("//span[@class='year']").text
+                    movie['year'] = year
+                    logging.info('Media #{}, YEAR LOOKUP #{}: {}'.format(i, count, movie))
+                except:
+                    pass
+        return movies
 
-            # get unique medias
-            medias = [dict(t) for t in set([tuple(d.items()) for d in medias])]
-            logging.info('post-unique, num of medias: {}'.format(len(medias)))
+    def scrape_and_write_medias(self):
+        self.start_driver()
+        if self.login():
+            logging.info('NETFLIX SHOW SEARCH')
+            shows = self.get_medias(mtype='show')
+            self.lookup_and_write_medias(medias=shows, mtype='show')
 
-            # self.driver.save_screenshot('static/screenshot.png')  ## if mem
 
-            # remove non-media
-            medias = [m for m in medias if 'feature' in m['link']]
-            logging.info('post-cleanup, num medias: {}'.format(len(medias)))
+            logging.info('NETFLIX MOVIE SEARCH')
+            movies = self.get_medias(mtype='movie')
 
-            # get year if not already in database
-            logging.info('getting year for all movies not in database')
-            for m in medias:
-                if page['mtype'] == 'movie' and not flaskapp.db_lookup_via_link(m['link']):
-                    self.driver.get(m['link'])
-                    sleep(randint(5,10))
-                    texts = self.driver.find_element_by_tag_name("body").text
-                    texts = texts.split('\n')
+            # restart driver, effectively logging out, for rate limiting
+            self.stop_driver()
+            self.start_driver()
 
-                    years = [t for t in texts if re.search('^\d{4}.+min$', t)]
-                    if len(years) > 0:
-                        m['year'] = years[0][:4]
-                    logging.info('year lookup: {}: {}'.format(m['title'], m.get('year', '')))
+            movies = self.add_years_to_movies(movies)
+            self.lookup_and_write_medias(medias=movies, mtype='movie')
 
-            self.lookup_and_write_medias(medias, mtype=page['mtype'], source=source)
+        else:
+            logging.error('NETFLIX login failed')
+
         self.stop_driver()
+        # remove any sources not just updated: media this provider no longer has
+        flaskapp.remove_old_sources('netflix')
 
+
+class ProviderSearch():
     def search_netflix(self):
         """Searches netflix for media"""
 
@@ -644,7 +719,10 @@ def main():
     #bot = ShoScraper()
     #bot.scrape_and_write_medias()
 
-    bot = HboScraper()
+    #bot = HboScraper()
+    #bot.scrape_and_write_medias()
+
+    bot = NetflixScraper()
     bot.scrape_and_write_medias()
 
     #bot.search_netflix()
