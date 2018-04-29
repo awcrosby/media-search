@@ -3,20 +3,23 @@
 # test_scraper.py
 
 import unittest
-from scraper import Scraper, ShoScraper, HboScraper, NetflixScraper
+import warnings
+import scraper
+
 
 class ScraperTestCase(unittest.TestCase):
-    # def setUp(self):
-    # def tearDown(self):
+    def setUp(self):
+        # ignore this unclosed socket warning that python usually suppresses
+        warnings.simplefilter("ignore", ResourceWarning)
 
-    def Xtest_driver_started(self):
-        bot = Scraper()
+    def test_driver_started(self):
+        bot = scraper.Scraper()
         bot.start_driver()
         bot.driver.current_url  # access attr of driver
         bot.stop_driver()
 
-    def Xtest_showtime_scrape(self):
-        sho = ShoScraper()
+    def test_showtime_scrape(self):
+        sho = scraper.ShoScraper()
 
         sho.get_movie_pages()
         self.assertTrue(len(sho.movie_pages) > 15)
@@ -25,8 +28,8 @@ class ScraperTestCase(unittest.TestCase):
         sho.get_shows()
         self.assertTrue(len(sho.shows) > 40)
 
-    def Xtest_hbo_scrape(self):
-        hbo = HboScraper()
+    def test_hbo_scrape(self):
+        hbo = scraper.HboScraper()
         hbo.start_driver(window_size='--window-size=1920,6000')
 
         movies = hbo.get_medias_from_page('/movies', mtype='movie', limit=True)
@@ -37,7 +40,7 @@ class ScraperTestCase(unittest.TestCase):
         hbo.stop_driver()
 
     def test_netflix_scrape(self):
-        netflix = NetflixScraper()
+        netflix = scraper.NetflixScraper()
         netflix.start_driver()
 
         self.assertTrue(netflix.login())
@@ -47,6 +50,25 @@ class ScraperTestCase(unittest.TestCase):
         self.assertTrue(len(shows) > 20)
 
         netflix.stop_driver()
+
+    def test_hulu_scrape(self):
+        hulu = scraper.HuluScraper()
+        hulu.start_driver()
+
+        self.assertTrue(hulu.login())
+
+        movie_genre_pages = hulu.get_genre_pages(mtype='movie')
+        self.assertTrue(len(movie_genre_pages) > 15)
+        movies = hulu.get_medias(movie_genre_pages, limit=True)
+        self.assertTrue(len(movies) > 3)
+
+        show_genre_pages = hulu.get_genre_pages(mtype='show')
+        self.assertTrue(len(show_genre_pages) > 15)
+        shows = hulu.get_medias(show_genre_pages, limit=True)
+        self.assertTrue(len(shows) > 3)
+
+        hulu.stop_driver()
+
 
 if __name__ == "__main__":
     unittest.main()
