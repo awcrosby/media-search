@@ -1,0 +1,16 @@
+## packages added by developer
+Flask
+Flask-RESTful
+requests
+requests-cache
+WTForms
+passlib
+pymongo
+beautifulsoup4
+selenium
+bottlenose
+lxml
+gunicorn
+pep8
+q
+pyvirtualdisplay
