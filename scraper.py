@@ -606,20 +606,18 @@ def main():
     """Executes each subclass of Scraper parent class,
        updates amazon sources for watchlist, reindexes database.
     """
-    bot = ShoScraper()
-    bot.scrape_and_write_medias()
+    site_scrapers = [
+        ShoScraper(),
+        HboScraper(),
+        NetflixScraper(),
+        HuluScraper(),
+    ]
+    for scraper in site_scrapers:
+        scraper.scrape_and_write_medias()
 
-    bot = HboScraper()
-    bot.scrape_and_write_medias()
+    parent_scraper = Scraper()
+    parent_scraper.update_watchlist_amz()
 
-    bot = NetflixScraper()
-    bot.scrape_and_write_medias()
-
-    bot = HuluScraper()
-    bot.scrape_and_write_medias()
-
-    bot = Scraper()
-    bot.update_watchlist_amz()
     flaskapp.reindex_database()
 
 
