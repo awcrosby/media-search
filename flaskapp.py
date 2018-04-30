@@ -7,7 +7,7 @@
 """
 
 from flask import (Flask, render_template, request, redirect,
-                   url_for, flash, session, json, abort)
+                   url_for, flash, session, json, abort, send_from_directory)
 import time
 import pymongo
 import logging
@@ -139,6 +139,11 @@ def logout():
     session.clear()
     flash('You are now logged out', 'success')
     return redirect(url_for('login'))
+
+
+@app.route('/robots.txt')
+def static_from_root():
+    return send_from_directory('static', request.path[1:])
 
 
 # display user's watchlist
