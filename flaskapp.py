@@ -314,16 +314,21 @@ def themoviedb_lookup(mtype, id):
     if media.status_code != 200:
         return
 
-    # in case this is written to db, add needed keys
+    def set_year(date):
+        media['year'] = ''
+        if date and len(date) >= 4:
+            media['year'] = date[:4]
+        logging.info('year set')
+
+    # get media dict ready for templates and/or database
     media = media.json()
     media['sources'] = []
+    media['mtype'] = mtype
     if mtype == 'movie':
-        media['year'] = media['release_date'][:4]
-        media['mtype'] = 'movie'
+        set_year(date=media.get('release_date', None))
     else:
         media['title'] = media['name']
-        media['year'] = media['first_air_date'][:4]
-        media['mtype'] = mtype
+        set_year(date=media.get('first_air_date', None))
     return media
 
 
