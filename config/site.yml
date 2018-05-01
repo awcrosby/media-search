@@ -68,6 +68,7 @@
       git:
         repo: https://{{ githubuser | urlencode }}:{{ githubpw }}@github.com/awcrosby/media-search.git
         dest: ~/media-search
+        update: no
     - name: Create symlink for vim settings
       file:
         src: ~/media-search/config/.vimrc
@@ -77,11 +78,11 @@
       pip:
         requirements: ~/media-search/requirements.txt
         virtualenv: ~/media-search/venv
-    - name: Copy nginx config to replace the default
-      become: true
-      copy:
-        src: ~/media-search/config/nginx_config_pre_ssl
-        dest: /etc/nginx/sites-available/default
+    #- name: Copy nginx config to replace the default
+    #  become: true
+    #  copy:
+    #    src: ~/media-search/config/nginx_config_pre_ssl
+    #    dest: /etc/nginx/sites-available/default
     - name: Copy fail2ban config
       become: true
       copy:
@@ -112,10 +113,10 @@
         minute: 26
         hour: 5
         job: ~/media-search/config/mongo_bkup.sh
-    # - name: Add crontab entry to run provider_search.py
-    #   cron:
-    #     name: provider search
-    #     minute: 0
-    #     hour: 0
-    #     weekday: sun
-    #     job: cd /home/awcrosby/media-search && /home/awcrosby/media-search/venv/bin/python /home/awcrosby/media-search/provider_search.py
+    - name: Add crontab entry to run scraper.py
+      cron:
+        name: scraper
+        minute: 45
+        hour: 5
+        weekday: sun
+        job: cd /home/ubuntu/media-search && /home/ubuntu/media-search/venv/bin/python /home/ubuntu/media-search/scraper.py
