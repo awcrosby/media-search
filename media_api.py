@@ -1,14 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-# api_endpoints.py
+# media_api.py
 
 # REST-like api for media_search
 
 from flask_restful import Resource
 
 class WatchlistAPI(Resource):
-    decorators = [is_logged_in]
-
     def get(self):  # executed only by unit test
         user = db.Users.find_one({'email': session['email']})
         if not user:
@@ -37,16 +35,6 @@ class WatchlistAPI(Resource):
         return redirect(url_for('display_watchlist'))
 
 
-class UserAPI(Resource):
-    def post(self):
-        args = request.get_json()
-        db.Users.find_one_and_update(
-            {'email': session['email']},
-            {'$set': {'prefs': {'hideAmzPayIcons': args['hideAmzPayIcons'],
-                                'hideBlankLines': args['hideBlankLines']}}})
-        return '', 204
-
-
 class ItemAPI(Resource):
     def delete(self, mtype, mid):  # executed via javascript
         resp = db.Users.find_one_and_update(
@@ -56,9 +44,3 @@ class ItemAPI(Resource):
             return '', 204
         else:
             return 'Item was not deleted', 500
-
-
-# set up api resource routing
-api.add_resource(WatchlistAPI, '/api/watchlist')
-api.add_resource(UserAPI, '/api/user')
-api.add_resource(ItemAPI, '/api/item/<mtype>/<int:mid>')
