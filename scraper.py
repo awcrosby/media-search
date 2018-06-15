@@ -403,10 +403,10 @@ class NetflixScraper(Scraper):
                     break
 
             divs = self.driver.find_elements_by_xpath("//div[contains(@class, 'ptrack-content')]")
-            # import pdb; pdb.set_trace()
             for d in divs:
                 try:
-                    title = d.find_element_by_css_selector('div.video-preload-title-label').text
+                    # import pdb; pdb.set_trace()
+                    title = d.text
                     elements = d.get_attribute('data-ui-tracking-context').split(',')
                     vid_element = [i for i in elements if 'video_id' in i]
                     netflix_id = vid_element[0][vid_element[0].find(':')+1:]
@@ -414,6 +414,8 @@ class NetflixScraper(Scraper):
                     medias += [{'title': title, 'link': link}]
                 except NoSuchElementException:
                     logging.warning('no title found in netflix {}'.format(mtype))
+                except IndexError:
+                    logging.warning('no link found in netflix for title: {}'.format(title))
             logging.info('len(medias) so far: {}'.format(len(medias)))
             if limit:  # exit early for unit test
                 break
