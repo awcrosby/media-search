@@ -7,6 +7,7 @@
       package: name="{{item}}" state=latest
       with_items:
         - python3-pip
+        - python3-dev
         - virtualenv
         - git
         - nginx
@@ -54,7 +55,6 @@
 
 - hosts: myhost  # playbook to setup code environment
   vars:
-    githubuser: awcrosby@gmail.com
     services:
       - nginx
       - fail2ban
@@ -66,7 +66,7 @@
       file: path=~/media-search/ state=directory
     - name: Git clone media-search repo
       git:
-        repo: https://{{ githubuser | urlencode }}:{{ githubpw }}@github.com/awcrosby/media-search.git
+        repo: https://github.com/awcrosby/media-search.git
         dest: ~/media-search
         update: no
     - name: Create symlink for vim settings
@@ -78,15 +78,25 @@
       pip:
         requirements: ~/media-search/requirements.txt
         virtualenv: ~/media-search/venv
-    #- name: Copy nginx config to replace the default
-    #  become: true
-    #  copy:
-    #    src: ~/media-search/config/nginx_config_pre_ssl
-    #    dest: /etc/nginx/sites-available/default
+        virtualenv_site_packages: no
+
+    - name: Check if nginx config has been changed to SSL
+      lineinfile:
+        dest: /etc/nginx/sites-available/default
+        line: "    listen 443 ssl; # managed by Certbot"
+      check_mode: yes
+      register: nginx_ssl_check
+    - name: Copy pre-ssl nginx config if nginx ssl letsencrypt not configured
+      become: true
+      copy:
+        src: nginx_config_pre_ssl
+        dest: /etc/nginx/sites-available/default
+      when: nginx_ssl_check.changed
+
     - name: Copy fail2ban config
       become: true
       copy:
-        src: ~/media-search/config/jail.local
+        src: jail.local
         dest: /etc/fail2ban/
     - name: Restart services
       become: true
@@ -96,7 +106,7 @@
     - name: Copy services
       become: true
       copy:
-        src: ~/media-search/config/{{item}}
+        src: "{{item}}"
         dest: /etc/systemd/system/{{item}}
       with_items: "{{newServices}}"
     - name: Start and enable on startup the services
@@ -120,3 +130,17 @@
         hour: 5
         weekday: sun
         job: cd /home/ubuntu/media-search && /home/ubuntu/media-search/venv/bin/python /home/ubuntu/media-search/scraper.py
+
+
+- hosts: myhost  # check password auth is off and reboot
+  tasks:
+    - name: Check that password auth is off
+      lineinfile:
+        dest: /etc/ssh/sshd_config
+        line: "PasswordAuthentication no"
+      check_mode: yes
+      register: presence
+      failed_when: presence.changed
+    - name: Reboot server
+      become: true
+      command: reboot
