@@ -1,3 +1,6 @@
+## to generate requirements.txt use 
+## $ pip freeze -r requirements-dev.txt > requirements.txt
+##
 ## packages added by developer
 Flask
 Flask-RESTful
@@ -13,4 +16,4 @@ lxml
 gunicorn
 pep8
 q
-pyvirtualdisplay
+PyVirtualDisplay

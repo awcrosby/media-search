@@ -1,31 +1,37 @@
+## to generate requirements.txt use 
+## $ pip freeze -r requirements-dev.txt > requirements.txt
+##
 ## packages added by developer
-Flask>=0.12.3
+Flask==1.0.2
 Flask-RESTful==0.3.6
-requests>=2.20.0
+requests==2.20.1
 requests-cache==0.4.13
-WTForms==2.1
+WTForms==2.2.1
 passlib==1.7.1
-pymongo==3.6.0
-beautifulsoup4==4.6.0
-selenium==3.9.0
-bottlenose==1.1.7
-lxml==4.1.1
-gunicorn==19.7.1
+pymongo==3.7.2
+beautifulsoup4==4.6.3
+selenium==3.141.0
+bottlenose==1.1.8
+lxml==4.2.5
+gunicorn==19.9.0
 pep8==1.7.1
 q==2.6
-## The following requirements were added by pip freeze:
-aniso8601==2.0.0
-certifi==2018.1.18
-chardet==3.0.4
-click==6.7
-EasyProcess==0.2.3
-idna==2.6
-itsdangerous==0.24
-Jinja2==2.10
-MarkupSafe==1.0
-pkg-resources==0.0.0
-pytz==2018.3
 PyVirtualDisplay==0.2.1
+## The following requirements were added by pip freeze:
+aniso8601==4.0.1
+certifi==2018.11.29
+chardet==3.0.4
+Click==7.0
+EasyProcess==0.2.3
+idna==2.7
+itsdangerous==1.1.0
+Jinja2==2.10
+MarkupSafe==1.1.0
+packaging==18.0
+pip-review==1.0
+pkg-resources==0.0.0
+pyparsing==2.3.0
+pytz==2018.7
 six==1.11.0
-urllib3==1.22
+urllib3==1.24.1
 Werkzeug==0.14.1
