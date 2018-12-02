@@ -1,2 +1,2 @@
 [myhost]
-host1 ansible_ssh_host=ec2-54-186-71-96.us-west-2.compute.amazonaws.com ansible_user=ubuntu ansible_python_interpreter=/usr/bin/python3
+host1 ansible_ssh_host=167.99.234.122 ansible_user=ubuntu ansible_python_interpreter=/usr/bin/python3
