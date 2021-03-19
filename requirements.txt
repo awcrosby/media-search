@@ -25,7 +25,7 @@ Click==7.0
 EasyProcess==0.2.3
 idna==2.7
 itsdangerous==1.1.0
-Jinja2==2.10
+Jinja2==2.11.3
 MarkupSafe==1.1.0
 packaging==18.0
 pip-review==1.0
